@@ -818,8 +818,22 @@
                         <p class="welcome-subtitle">Get unfiltered, harsh, career-changing advice from your AI mentor.</p>
                     </div>
                 </div>
-                <div class="card" style="max-width:640px; margin:0 auto;">
-                    <h2 style="font-family:'Outfit', sans-serif; font-weight:800; color:var(--text-main); margin-bottom:16px;">🔥 Ask Your Brutal Mentor</h2>
+
+                <!-- Tab selection -->
+                <div class="results-tabs" style="margin:0 auto 24px auto; display:flex; width:100%; max-width:680px; box-sizing:border-box;">
+                    <button class="tab-btn active" id="tab-mentor-career" style="flex:1; padding:12px; font-size:0.95rem; display:flex; align-items:center; justify-content:center; gap:8px;">
+                        <span>💼</span> Career Mentor
+                    </button>
+                    <button class="tab-btn" id="tab-mentor-coding" style="flex:1; padding:12px; font-size:0.95rem; display:flex; align-items:center; justify-content:center; gap:8px;">
+                        <span>💻</span> Coding Mentor
+                    </button>
+                </div>
+
+                <!-- Career Mentor Panel -->
+                <div id="panel-mentor-career" class="card" style="max-width:680px; margin:0 auto; display:block;">
+                    <h2 style="font-family:'Outfit', sans-serif; font-weight:800; color:var(--text-main); margin-bottom:6px;">💼 Career Guidance Mentor</h2>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Receive a strategic assessment of your career roadmap and skills suitability.</p>
+                    
                     <label class="input-label">Your Career Goal</label>
                     <input id="mentor-goal-page" type="text" placeholder="e.g. Backend Engineer at Google" class="skill-input" style="padding:12px; margin-bottom:16px; width:100%; box-sizing:border-box;" />
                     
@@ -827,9 +841,45 @@
                     <input id="mentor-skills-page" type="text" placeholder="e.g. React, HTML, CSS, JavaScript" class="skill-input" style="padding:12px; margin-bottom:20px; width:100%; box-sizing:border-box;" />
                     
                     <button id="mentor-submit-btn-page" class="cta-button" style="width:100%; padding:14px; background:linear-gradient(135deg,#f97316,#dc2626); border:none; border-radius:12px; color:white; font-size:1rem; font-weight:700; cursor:pointer;">
-                        Get Brutal Advice ⚡
+                        Get Brutal Career Advice ⚡
                     </button>
                     <div id="mentor-result-page" style="margin-top:20px;"></div>
+                </div>
+
+                <!-- Coding Mentor Panel -->
+                <div id="panel-mentor-coding" class="card" style="max-width:680px; margin:0 auto; display:none;">
+                    <h2 style="font-family:'Outfit', sans-serif; font-weight:800; color:var(--text-main); margin-bottom:6px;">💻 Coding Standings Mentor</h2>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Your coding profile handles and database metrics will be analyzed to pinpoint where you are lagging.</p>
+                    
+                    <!-- Stats / Profiles Summary Grid -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+                        <div style="background:var(--bg-main); border:1px solid var(--border); padding:12px 16px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">LeetCode Profile</span>
+                            <span id="summary-leetcode" style="font-size:0.9rem; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</span>
+                        </div>
+                        <div style="background:var(--bg-main); border:1px solid var(--border); padding:12px 16px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">GitHub Profile</span>
+                            <span id="summary-github" style="font-size:0.9rem; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</span>
+                        </div>
+                        <div style="background:var(--bg-main); border:1px solid var(--border); padding:12px 16px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Codeforces Profile</span>
+                            <span id="summary-codeforces" style="font-size:0.9rem; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</span>
+                        </div>
+                        <div style="background:var(--bg-main); border:1px solid var(--border); padding:12px 16px; border-radius:8px; display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Codementor Profile</span>
+                            <span id="summary-codementor" style="font-size:0.9rem; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; background:rgba(37,99,235,0.05); border:1px solid rgba(37,99,235,0.15); padding:12px 16px; border-radius:8px;">
+                        <span style="font-size:0.8rem; color:var(--text-sub); font-weight:500;">Need to update your coding profiles?</span>
+                        <button id="btn-mentor-go-settings" class="btn-outline-primary" style="padding:6px 12px; font-size:0.75rem; border-radius:6px; cursor:pointer;">Go to Settings</button>
+                    </div>
+
+                    <button id="coding-submit-btn-page" class="cta-button" style="width:100%; padding:14px; background:linear-gradient(135deg,#6366f1,#4f46e5); border:none; border-radius:12px; color:white; font-size:1rem; font-weight:700; cursor:pointer;">
+                        Analyze Coding Profiles & DSA ⚡
+                    </button>
+                    <div id="coding-result-page" style="margin-top:20px;"></div>
                 </div>
             </section>
 
@@ -1083,6 +1133,28 @@
                                     <strong id="profile-user-name" style="color:var(--text-main); font-size:1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</strong>
                                     <span id="profile-user-email" style="color:var(--text-muted); font-size:0.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading...</span>
                                 </div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:12px; border-top:1px solid var(--border); padding-top:16px;">
+                                <h4 style="font-family:'Outfit', sans-serif; font-weight:700; color:var(--text-main); margin-bottom:4px;">🔗 Coding Profiles</h4>
+                                <div>
+                                    <label class="input-label" style="font-size:0.8rem; margin-bottom:4px; display:block;">LeetCode Profile</label>
+                                    <input id="settings-leetcode" type="text" placeholder="LeetCode username or URL" class="skill-input" style="padding:10px; width:100%; box-sizing:border-box;" />
+                                </div>
+                                <div>
+                                    <label class="input-label" style="font-size:0.8rem; margin-bottom:4px; display:block;">GitHub Profile</label>
+                                    <input id="settings-github" type="text" placeholder="GitHub username or URL" class="skill-input" style="padding:10px; width:100%; box-sizing:border-box;" />
+                                </div>
+                                <div>
+                                    <label class="input-label" style="font-size:0.8rem; margin-bottom:4px; display:block;">Codeforces Profile</label>
+                                    <input id="settings-codeforces" type="text" placeholder="Codeforces username or URL" class="skill-input" style="padding:10px; width:100%; box-sizing:border-box;" />
+                                </div>
+                                <div>
+                                    <label class="input-label" style="font-size:0.8rem; margin-bottom:4px; display:block;">Codementor Profile</label>
+                                    <input id="settings-codementor" type="text" placeholder="Codementor username or URL" class="skill-input" style="padding:10px; width:100%; box-sizing:border-box;" />
+                                </div>
+                                <button id="btn-save-profiles" class="cta-button" style="padding:12px; margin-top:8px; font-size:0.9rem; width:100%;">
+                                    Save Coding Profiles
+                                </button>
                             </div>
                             <button class="btn-outline-primary" style="color:var(--danger); border-color:var(--danger); width:100%; height:44px; display:flex; align-items:center; justify-content:center; font-weight:600;" onclick="location.href='/logout'">
                                 Sign Out / Log Out

@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionId = 'sp_' + Math.random().toString(36).substr(2, 12);
         sessionStorage.setItem('sp_sid', sessionId);
     }
+    let currentUserId = null;
 
     // Local results store
     let currentSkill = '';
@@ -2573,6 +2574,9 @@ document.addEventListener('DOMContentLoaded', () => {
             loadProjects();
         } else if (targetViewId === 'view-settings') {
             initProfileMilestones();
+            loadCodingProfiles();
+        } else if (targetViewId === 'view-mentor') {
+            loadCodingProfiles();
         } else if (targetViewId === 'view-interviews') {
             loadInterviewHistory();
             initInterviewInputs();
@@ -2640,6 +2644,13 @@ document.addEventListener('DOMContentLoaded', () => {
         mentorSubmitPage.addEventListener('click', async () => {
             const goal = document.getElementById('mentor-goal-page').value.trim();
             const skills = document.getElementById('mentor-skills-page').value.trim();
+            
+            // Automatically fetch coding profiles from Settings inputs or LocalStorage
+            const leetcode = document.getElementById('settings-leetcode')?.value.trim() || localStorage.getItem('profile_leetcode') || "";
+            const github = document.getElementById('settings-github')?.value.trim() || localStorage.getItem('profile_github') || "";
+            const codeforces = document.getElementById('settings-codeforces')?.value.trim() || localStorage.getItem('profile_codeforces') || "";
+            const codementor = document.getElementById('settings-codementor')?.value.trim() || localStorage.getItem('profile_codementor') || "";
+
             if (!goal) { mentorResultPage.innerHTML = '<p style="color:#f97316">Please enter your career goal.</p>'; return; }
 
             mentorSubmitPage.textContent = 'Consulting your mentor...';
@@ -2650,7 +2661,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch('/mentor-mode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ goal, current_skills: skills })
+                    body: JSON.stringify({ 
+                        goal, 
+                        current_skills: skills,
+                        leetcode_profile: leetcode,
+                        github_profile: github,
+                        codeforces_profile: codeforces,
+                        codementor_profile: codementor
+                    })
                 });
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
@@ -2660,6 +2678,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p style="color:#f97316; font-weight:700; font-size:1.05rem; margin-bottom:12px;">
                             "${escapeHTML(data.verdict)}"
                         </p>
+                        ${ data.lagging_areas && data.lagging_areas.length ? `
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">⚠️ Where you are lagging behind:</p>
+                        <ul style="padding-left:16px; color:var(--danger); font-size:0.85rem; margin-bottom:12px;">
+                            ${data.lagging_areas.map(area => `<li>${escapeHTML(area)}</li>`).join('')}
+                        </ul>` : ''}
                         ${ data.wasted_time && data.wasted_time.length ? `
                         <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:4px; font-weight:600;">⛔ Stop wasting time on:</p>
                         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
@@ -2669,6 +2692,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">✅ Learn these NOW:</p>
                         <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px;">
                             ${data.must_learn_now.map(i => `<li><strong>${escapeHTML(i.skill)}</strong> — ${escapeHTML(i.reason)}</li>`).join('')}
+                        </ul>` : ''}
+                        ${ data.improvement_suggestions && data.improvement_suggestions.length ? `
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">💡 How to do it better:</p>
+                        <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px; line-height:1.5;">
+                            ${data.improvement_suggestions.map(s => `<li><strong>${escapeHTML(s.action)}</strong> — ${escapeHTML(s.how_to_do_better)}</li>`).join('')}
                         </ul>` : ''}
                         <p style="color:var(--text-sub); font-size:0.85rem; line-height:1.6; margin-bottom:12px;">
                             ${escapeHTML(data.brutal_truth)}
@@ -3137,6 +3165,85 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Coding Profiles Logic
+    const loadCodingProfiles = async () => {
+        let leetcode = "";
+        let github = "";
+        let codeforces = "";
+        let codementor = "";
+
+        // 1. Try DB first
+        if (currentUserId && window.db) {
+            try {
+                const profile = await window.db.getProfile(currentUserId);
+                if (profile) {
+                    leetcode = profile.leetcode_profile || "";
+                    github = profile.github_profile || "";
+                    codeforces = profile.codeforces_profile || "";
+                    codementor = profile.codementor_profile || "";
+                }
+            } catch (e) {
+                console.warn("DB profile load failed (expected if columns not migrated yet):", e);
+            }
+        }
+
+        // 2. Fallback to localStorage
+        if (!leetcode) leetcode = localStorage.getItem('profile_leetcode') || "";
+        if (!github) github = localStorage.getItem('profile_github') || "";
+        if (!codeforces) codeforces = localStorage.getItem('profile_codeforces') || "";
+        if (!codementor) codementor = localStorage.getItem('profile_codementor') || "";
+
+        // 3. Populate inputs & summaries
+        const setValAndSummary = (id, summaryId, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+            const summaryEl = document.getElementById(summaryId);
+            if (summaryEl) {
+                summaryEl.textContent = val ? val : "Not configured 🛑";
+                summaryEl.style.color = val ? "var(--text-main)" : "var(--danger)";
+            }
+        };
+        setValAndSummary('settings-leetcode', 'summary-leetcode', leetcode);
+        setValAndSummary('settings-github', 'summary-github', github);
+        setValAndSummary('settings-codeforces', 'summary-codeforces', codeforces);
+        setValAndSummary('settings-codementor', 'summary-codementor', codementor);
+    };
+
+    const saveCodingProfiles = async () => {
+        const leetcode = document.getElementById('settings-leetcode')?.value.trim() || "";
+        const github = document.getElementById('settings-github')?.value.trim() || "";
+        const codeforces = document.getElementById('settings-codeforces')?.value.trim() || "";
+        const codementor = document.getElementById('settings-codementor')?.value.trim() || "";
+
+        // Save to local storage for safety/instant feedback
+        localStorage.setItem('profile_leetcode', leetcode);
+        localStorage.setItem('profile_github', github);
+        localStorage.setItem('profile_codeforces', codeforces);
+        localStorage.setItem('profile_codementor', codementor);
+
+        // Save to DB
+        let dbSaved = false;
+        if (currentUserId && window.db) {
+            try {
+                await window.db.updateProfile(currentUserId, {
+                    leetcode_profile: leetcode,
+                    github_profile: github,
+                    codeforces_profile: codeforces,
+                    codementor_profile: codementor
+                });
+                dbSaved = true;
+            } catch (e) {
+                console.error("Failed to save coding profiles to Supabase:", e);
+            }
+        }
+
+        if (dbSaved) {
+            showToast('✅ Coding profiles saved successfully to Cloud & local storage!');
+        } else {
+            showToast('✅ Coding profiles saved locally (Cloud sync failed or pending schema migration).');
+        }
+    };
+
     // Set Welcome back title initials and text
     const updateWelcomeMessage = async () => {
         let name = 'Learner';
@@ -3149,6 +3256,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.logged_in) {
                     name = data.name;
                     email = data.email || (name.toLowerCase() + '@example.com');
+                    currentUserId = data.id;
+                    // Pre-load coding profiles as soon as user ID is ready
+                    loadCodingProfiles();
                 }
             }
         } catch (e) {
@@ -3194,6 +3304,292 @@ document.addEventListener('DOMContentLoaded', () => {
     initSavedPlaylists();
     initActiveRoadmap();
     initProfileMilestones();
+
+    // Wire up Save Coding Profiles settings button
+    const btnSaveProfiles = document.getElementById('btn-save-profiles');
+    if (btnSaveProfiles) {
+        btnSaveProfiles.addEventListener('click', saveCodingProfiles);
+    }
+
+    // AI Mentor Tab Switcher Logic
+    const tabMentorCareer = document.getElementById('tab-mentor-career');
+    const tabMentorCoding = document.getElementById('tab-mentor-coding');
+    const panelMentorCareer = document.getElementById('panel-mentor-career');
+    const panelMentorCoding = document.getElementById('panel-mentor-coding');
+
+    if (tabMentorCareer && tabMentorCoding && panelMentorCareer && panelMentorCoding) {
+        tabMentorCareer.addEventListener('click', () => {
+            tabMentorCareer.classList.add('active');
+            tabMentorCoding.classList.remove('active');
+            panelMentorCareer.style.display = 'block';
+            panelMentorCoding.style.display = 'none';
+        });
+
+        tabMentorCoding.addEventListener('click', () => {
+            tabMentorCoding.classList.add('active');
+            tabMentorCareer.classList.remove('active');
+            panelMentorCoding.style.display = 'block';
+            panelMentorCareer.style.display = 'none';
+            loadCodingProfiles();
+        });
+    }
+
+    // Redirect to Settings button
+    const btnMentorGoSettings = document.getElementById('btn-mentor-go-settings');
+    if (btnMentorGoSettings) {
+        btnMentorGoSettings.addEventListener('click', () => {
+            const settingsTabBtn = document.getElementById('btn-sidebar-settings');
+            if (settingsTabBtn) settingsTabBtn.click();
+        });
+    }
+
+    // Coding Mentor Submit Logic
+    const codingSubmitBtnPage = document.getElementById('coding-submit-btn-page');
+    const codingResultPage = document.getElementById('coding-result-page');
+
+    if (codingSubmitBtnPage && codingResultPage) {
+        codingSubmitBtnPage.addEventListener('click', async () => {
+            const leetcode = document.getElementById('settings-leetcode')?.value.trim() || localStorage.getItem('profile_leetcode') || "";
+            const github = document.getElementById('settings-github')?.value.trim() || localStorage.getItem('profile_github') || "";
+            const codeforces = document.getElementById('settings-codeforces')?.value.trim() || localStorage.getItem('profile_codeforces') || "";
+            const codementor = document.getElementById('settings-codementor')?.value.trim() || localStorage.getItem('profile_codementor') || "";
+
+            if (!leetcode && !github && !codeforces && !codementor) {
+                codingResultPage.innerHTML = `
+                    <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:12px; color:#ef4444; font-size:0.85rem; font-weight:600; margin-top:16px;">
+                        ⚠️ Please configure at least one coding profile (LeetCode, GitHub, Codeforces, or Codementor) in Settings to execute the analysis.
+                    </div>
+                `;
+                return;
+            }
+
+            codingSubmitBtnPage.textContent = 'Auditing coding standing...';
+            codingSubmitBtnPage.disabled = true;
+            codingResultPage.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div><p style="color:var(--text-sub);">⚡ Analyzing coding standings & DSA progress...</p></div>';
+
+            try {
+                const res = await fetch('/mentor-mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        mentor_type: "coding",
+                        goal: "Full technical analysis and coding standing critique",
+                        current_skills: "Software development and problem solving",
+                        leetcode_profile: leetcode,
+                        github_profile: github,
+                        codeforces_profile: codeforces,
+                        codementor_profile: codementor
+                    })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                const snapshot = data.performance_snapshot || {};
+                const strengths = data.strengths || [];
+                const growthAreas = data.high_impact_growth_areas || {};
+                const readiness = data.interview_readiness || {};
+                const roadmap = data.roadmap_30_day || {};
+                const insights = data.ai_insights || [];
+                const motivation = data.motivation || "";
+                const dbCards = data.visual_dashboard_cards || {};
+
+                codingResultPage.innerHTML = `
+                    <div style="border-top: 1px solid var(--border); padding-top: 24px; margin-top: 24px; display: flex; flex-direction: column; gap: 28px;">
+                        
+                        <!-- Header Banner -->
+                        <div style="background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 16px; padding: 28px; color: white; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);">
+                            <h2 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+                                🔥 Coding Growth Report
+                            </h2>
+                            <p style="margin: 0; font-size: 0.95rem; opacity: 0.9; font-weight: 500;">
+                                Premium Technical Alignment & Placement Readiness Audit
+                            </p>
+                        </div>
+
+                        <!-- 1. Performance Snapshot -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                📊 1. Performance Snapshot
+                            </h3>
+                            <p style="font-size: 0.925rem; line-height: 1.6; color: var(--text-sub); margin: 0; padding: 14px; background: rgba(99, 102, 241, 0.04); border-left: 4px solid #6366f1; border-radius: 0 8px 8px 0; font-style: italic;">
+                                "${escapeHTML(snapshot.summary)}"
+                            </p>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 8px;">
+                                <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Total Solved</span>
+                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.total_solved || '0')} Problems</strong>
+                                </div>
+                                <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Difficulty Breakdown</span>
+                                    <strong style="font-size: 1rem; color: var(--text-main);">${escapeHTML(snapshot.difficulty_distribution || '—')}</strong>
+                                </div>
+                                <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Strongest Platform</span>
+                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.strongest_platform || '—')}</strong>
+                                </div>
+                                <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Contests & Streak</span>
+                                    <strong style="font-size: 0.95rem; color: var(--text-main);">${escapeHTML(snapshot.contest_participation || '—')} (${escapeHTML(snapshot.current_streak || '0')})</strong>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Growth Score:</span>
+                                    <span style="font-size: 1.4rem; font-weight: 800; color: #6366f1;">${escapeHTML(snapshot.growth_score || '0')}/100</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Current Tier:</span>
+                                    <span class="pill-badge" style="background: var(--primary-light); color: var(--primary); font-weight: 800; font-size: 0.85rem; padding: 6px 12px; border-radius: 6px;">
+                                        ${escapeHTML(snapshot.level || 'Beginner Explorer')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Strength Analysis -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                🌟 2. Strength Analysis
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
+                                ${strengths.map(s => `
+                                    <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                        <strong style="color: var(--success); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                                            <span>✔</span> ${escapeHTML(s.title)}
+                                        </strong>
+                                        <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub); line-height: 1.5;">${escapeHTML(s.why)}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- 3. Skill Gap Analysis -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                🎯 3. High-Impact Areas for Growth
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                <div style="background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+                                    <strong style="color: #ef4444; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🔴 Critical</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                        ${(growthAreas.critical || []).map(topic => `<span class="pill-badge" style="background:#fef2f2; color:#ef4444; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+                                    <strong style="color: #f59e0b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🟡 Important</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                        ${(growthAreas.important || []).map(topic => `<span class="pill-badge" style="background:#fffbeb; color:#d97706; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div style="background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
+                                    <strong style="color: #3b82f6; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🔵 Optional</strong>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                        ${(growthAreas.optional || []).map(topic => `<span class="pill-badge" style="background:#eff6ff; color:#2563eb; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Interview Readiness Assessment -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                💼 4. Interview Readiness Assessment
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex-wrap: wrap;">
+                                <div style="display: flex; flex-direction: column; gap: 14px;">
+                                    ${[
+                                        { label: "Internship Interviews", val: readiness.internships || 0, color: "#10b981" },
+                                        { label: "Service Companies", val: readiness.service_companies || 0, color: "#3b82f6" },
+                                        { label: "Product Companies", val: readiness.product_companies || 0, color: "#f59e0b" },
+                                        { label: "FAANG-Level Interviews", val: readiness.faang_level || 0, color: "#ef4444" }
+                                    ].map(item => `
+                                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-main);">
+                                                <span>${escapeHTML(item.label)}</span>
+                                                <span>${item.val}%</span>
+                                            </div>
+                                            <div style="width: 100%; background: var(--border); height: 8px; border-radius: 4px; overflow: hidden;">
+                                                <div style="background: ${item.color}; height: 100%; width: ${item.val}%; border-radius: 4px; transition: width 0.6s ease;"></div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div style="background: rgba(99, 102, 241, 0.03); border: 1px solid var(--border); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+                                    <strong style="font-size: 0.85rem; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">Auditor Action Needed</strong>
+                                    <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub); line-height: 1.5;">${escapeHTML(readiness.next_level_needs)}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. Personalized Roadmap -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                🗓 5. 30-Day Personalized Action Plan
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+                                ${["week_1", "week_2", "week_3", "week_4"].map((wk, idx) => `
+                                    <div style="background: var(--bg-main); border: 1px solid var(--border); border-top: 4px solid var(--primary); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                                        <strong style="color: var(--text-main); font-size: 0.95rem;">Week ${idx + 1} Planning</strong>
+                                        <ul style="padding-left: 16px; margin: 0; font-size: 0.825rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 6px; line-height: 1.4;">
+                                            ${(roadmap[wk] || []).map(action => `<li>${escapeHTML(action)}</li>`).join('')}
+                                        </ul>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- 6 & 7: Insights & Motivation -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex-wrap: wrap;">
+                            <div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+                                <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                    💡 6. AI Insights
+                                </h4>
+                                <ul style="padding-left: 18px; margin: 0; font-size: 0.85rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 8px; line-height: 1.5;">
+                                    ${insights.map(item => `<li>${escapeHTML(item)}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.02), rgba(168, 85, 247, 0.02)); justify-content: center; border: 1px dashed rgba(99,102,241,0.25);">
+                                <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                    ✨ 7. Growth Motivation
+                                </h4>
+                                <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub); line-height: 1.6; font-style: italic;">
+                                    "${escapeHTML(motivation)}"
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 8. Visual Dashboard Suggestions -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                🎴 8. Visual Dashboard Cards Recommendations
+                            </h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                                ${[
+                                    { title: "Achievement Card", text: dbCards.achievement_card || "🏆 Setup achievements details" },
+                                    { title: "Growth Score Card", text: dbCards.growth_score_card || "📈 Track scores weekly" },
+                                    { title: "Interview Readiness Card", text: dbCards.interview_readiness_card || "🎯 Monitor placement status" },
+                                    { title: "Next Milestone Card", text: dbCards.next_milestone_card || "⚡ Reach next level goals" },
+                                    { title: "30-Day Roadmap Card", text: dbCards.roadmap_card || "🗓 Review action planning daily" },
+                                    { title: "Streak Card", text: dbCards.streak_card || "🔥 Keep coding consistency" }
+                                ].map(card => `
+                                    <div style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 4px;">
+                                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">${escapeHTML(card.title)}</span>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-main); font-weight: 600; line-height: 1.4;">${escapeHTML(card.text)}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                    </div>
+                `;
+            } catch(e) {
+                codingResultPage.innerHTML = `<p style="color:var(--danger); margin-top:16px;">Failed: ${escapeHTML(e.message)}</p>`;
+            } finally {
+                codingSubmitBtnPage.textContent = 'Analyze Coding Profiles & DSA ⚡';
+                codingSubmitBtnPage.disabled = false;
+            }
+        });
+    }
 
     // Expose trackClick globally for inline onclick handlers
     window.trackClickGlobal = (url, title) => trackClick(url, title, 'click');

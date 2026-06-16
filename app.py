@@ -848,39 +848,337 @@ def track_click():
         return jsonify({"status": "error"}), 500
 
 
+def extract_leetcode_username(profile_input):
+    if not profile_input:
+        return ""
+    profile_input = profile_input.strip().rstrip("/")
+    if "leetcode.com/" in profile_input:
+        parts = profile_input.split("leetcode.com/")[-1].split("/")
+        if parts[0] == "u" and len(parts) > 1:
+            return parts[1]
+        return parts[0]
+    return profile_input
+
+def fetch_leetcode_graphql_stats(username):
+    if not username:
+        return None
+    url = "https://leetcode.com/graphql"
+    payload = {
+        "query": """
+        query userProblemsSolved($username: String!) {
+          matchedUser(username: $username) {
+            submitStatsGlobal {
+              acSubmissionNum {
+                difficulty
+                count
+              }
+            }
+          }
+        }
+        """,
+        "variables": {"username": username}
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json().get("data", {})
+            matched_user = data.get("matchedUser")
+            if matched_user:
+                ac_submissions = matched_user.get("submitStatsGlobal", {}).get("acSubmissionNum", [])
+                stats = {"All": 0, "Easy": 0, "Medium": 0, "Hard": 0}
+                for sub in ac_submissions:
+                    diff = sub.get("difficulty")
+                    count = sub.get("count", 0)
+                    if diff in stats:
+                        stats[diff] = count
+                return stats
+    except Exception as e:
+        print(f"[LEETCODE] GraphQL fetch failed for {username}: {e}")
+    return None
+
 # ── STEP 9: Brutal Mentor Mode ────────────────────────────────────
 @app.route("/mentor-mode", methods=["POST"])
 def mentor_mode():
-    body           = request.get_json(silent=True) or {}
-    goal           = (body.get("goal") or "").strip()
-    current_skills = (body.get("current_skills") or "").strip()
+    body               = request.get_json(silent=True) or {}
+    goal               = (body.get("goal") or "").strip()
+    current_skills     = (body.get("current_skills") or "").strip()
+    leetcode_profile   = (body.get("leetcode_profile") or "").strip()
+    github_profile     = (body.get("github_profile") or "").strip()
+    codeforces_profile = (body.get("codeforces_profile") or "").strip()
+    codementor_profile = (body.get("codementor_profile") or "").strip()
 
     if not goal:
         return jsonify({"error": "goal is required"}), 400
 
+    user_id = session.get("user_id")
+    sb = get_sb()
+
+    # Pre-populate empty profiles from database if they exist
+    if sb and user_id:
+        try:
+            p_res = sb.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+            if p_res.data:
+                db_profile = p_res.data[0]
+                if not leetcode_profile: leetcode_profile = db_profile.get("leetcode_profile") or ""
+                if not github_profile: github_profile = db_profile.get("github_profile") or ""
+                if not codeforces_profile: codeforces_profile = db_profile.get("codeforces_profile") or ""
+                if not codementor_profile: codementor_profile = db_profile.get("codementor_profile") or ""
+        except Exception as e:
+            print(f"[MENTOR] Fetching profile failed: {e}")
+
+    # Fetch in-app performance metrics
+    dsa_progress = []
+    dsa_stats = None
+    resume_score = None
+    resume_suggestions = None
+    projects = []
+
+    if sb and user_id:
+        # 1. Fetch DSA progress list
+        try:
+            dsa_res = sb.table("learning_progress").select("completed_steps").eq("session_id", user_id).eq("skill_name", "dsa").limit(1).execute()
+            if dsa_res.data:
+                dsa_progress = dsa_res.data[0].get("completed_steps") or []
+        except Exception as e:
+            print(f"[MENTOR] Fetching DSA progress failed: {e}")
+
+        # 1b. Fetch DSA summary stats from dsa_progress
+        try:
+            stats_res = sb.table("dsa_progress").select("*").eq("user_id", user_id).limit(1).execute()
+            if stats_res.data:
+                dsa_stats = stats_res.data[0]
+        except Exception as e:
+            print(f"[MENTOR] Fetching DSA stats failed: {e}")
+
+        # 2. Fetch latest Resume analysis
+        try:
+            resume_res = sb.table("resume_analysis").select("ats_score", "improvement_suggestions").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+            if resume_res.data:
+                resume_score = resume_res.data[0].get("ats_score")
+                resume_suggestions = resume_res.data[0].get("improvement_suggestions")
+        except Exception as e:
+            print(f"[MENTOR] Fetching resume failed: {e}")
+
+        # 3. Fetch custom projects portfolio
+        try:
+            proj_res = sb.table("learning_progress").select("completed_steps").eq("session_id", user_id).eq("skill_name", "user_projects").limit(1).execute()
+            if proj_res.data:
+                projects = proj_res.data[0].get("completed_steps") or []
+        except Exception as e:
+            print(f"[MENTOR] Fetching projects failed: {e}")
+
+    # 4. Aggregate DSA progress statistics
+    total_count = len(dsa_progress)
+    easy_count = 0
+    medium_count = 0
+    hard_count = 0
+    topic_counts = {}
+
+    for item in dsa_progress:
+        if isinstance(item, dict):
+            diff = (item.get("difficulty") or "Easy").strip().capitalize()
+            if "Easy" in diff:
+                easy_count += 1
+            elif "Med" in diff:
+                medium_count += 1
+            elif "Hard" in diff:
+                hard_count += 1
+            else:
+                easy_count += 1
+            
+            topic = (item.get("topic") or "General").strip()
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+    # 5. Fetch live LeetCode stats if profile is provided
+    live_leetcode_fetched = False
+    if leetcode_profile:
+        leetcode_username = extract_leetcode_username(leetcode_profile)
+        live_stats = fetch_leetcode_graphql_stats(leetcode_username)
+        if live_stats:
+            total_count = live_stats.get("All", 0)
+            easy_count = live_stats.get("Easy", 0)
+            medium_count = live_stats.get("Medium", 0)
+            hard_count = live_stats.get("Hard", 0)
+            live_leetcode_fetched = True
+
+    if not live_leetcode_fetched and dsa_stats:
+        total_count = max(dsa_stats.get("total_solved") or 0, total_count)
+        easy_count = max(dsa_stats.get("easy_solved") or 0, easy_count)
+        medium_count = max(dsa_stats.get("medium_solved") or 0, medium_count)
+        hard_count = max(dsa_stats.get("hard_solved") or 0, hard_count)
+
+    mentor_type = (body.get("mentor_type") or "career").strip().lower()
+
     client = Groq()
-    system_prompt = """You are a brutally honest, elite Tech Career Mentor.
+    if mentor_type == "coding":
+        system_prompt = """You are an elite AI Career Mentor from a top tech company, integrated into SkillPath.
+Your job is to analyze the user's coding standings across their coding profiles (LeetCode, GitHub, Codeforces, Codementor) and their algorithmic (DSA) performance data, and generate a premium, personalized Coding Growth Report.
+
+Strict Rules:
+- Never shame the user. Avoid generic criticism. Keep it constructive and encouraging.
+- Never use phrases like: "major red flag", "not competitive", "you are lagging badly".
+- Always highlight achievements before weaknesses. Convert weaknesses into opportunities/high-impact growth areas.
+- Do NOT mention resume ATS score or projects portfolio. Focus EXCLUSIVELY on their coding standings, algorithmic weaknesses, and profiles.
+
+RETURN EXACTLY THIS JSON:
+{
+  "performance_snapshot": {
+    "summary": "An encouraging summary highlighting achievements first (e.g., 'Great progress! You've solved X problems...')",
+    "total_solved": 116,
+    "difficulty_distribution": "e.g., '90 Easy, 20 Medium, 6 Hard'",
+    "contest_participation": "e.g., 'Participated in 2 weekly contests' or description",
+    "current_streak": "e.g., '5 days'",
+    "strongest_platform": "e.g., 'LeetCode'",
+    "growth_score": 68,
+    "level": "Emerging Problem Solver"
+  },
+  "strengths": [
+    {
+      "title": "Name of strength (e.g., Strong consistency in solving Easy and Medium problems)",
+      "why": "Explanation of WHY this is a strength"
+    }
+  ],
+  "high_impact_growth_areas": {
+    "critical": ["topic1", "topic2"],
+    "important": ["topic3", "topic4"],
+    "optional": ["topic5", "topic6"]
+  },
+  "interview_readiness": {
+    "internships": 82,
+    "service_companies": 76,
+    "product_companies": 58,
+    "faang_level": 34,
+    "next_level_needs": "Explain what is needed to move to the next level"
+  },
+  "roadmap_30_day": {
+    "week_1": ["Solve 2 Array problems daily", "Learn Linked Lists", "Maintain streak"],
+    "week_2": ["action3", "action4"],
+    "week_3": ["action5", "action6"],
+    "week_4": ["action7", "action8"]
+  },
+  "ai_insights": [
+    "Intelligent observation 1 (e.g., 'You perform better in structured topics than exploratory contests.')",
+    "Intelligent observation 2"
+  ],
+  "motivation": "A personalized motivational message (inspiring but realistic)",
+  "visual_dashboard_cards": {
+    "achievement_card": "🏆 Achievement Card content with emoji",
+    "growth_score_card": "📈 Growth Score Card content with emoji",
+    "interview_readiness_card": "🎯 Interview Readiness Card content with emoji",
+    "next_milestone_card": "⚡ Next Milestone Card content with emoji",
+    "roadmap_card": "🗓 30-Day Roadmap Card content with emoji",
+    "streak_card": "🔥 Streak Card content with emoji"
+  }
+}
+Return only valid JSON."""
+    else:
+        system_prompt = """You are a brutally honest, elite Tech Career Mentor.
 Your job is to give harsh, direct, actionable career advice.
 Be specific. Call out wasted time. Redirect focus.
 Never be gentle. Be like a senior engineer who wants the person to actually succeed.
+
+Evaluate the candidate's coding profiles (e.g., LeetCode, GitHub, Codeforces, Codementor) if they are provided, AND analyze their in-app learning activity, DSA progress, and project portfolio.
+Contrast their performance metrics against their target career goal:
+- Identify specifically where they are lagging behind:
+  - If their solved DSA count is low (e.g. less than 50-100 solved problems), critique their lack of consistency.
+  - If their resume ATS score is low (e.g. less than 80) or no resume is uploaded, call them out on not having a recruiter-ready resume.
+  - If they have very few projects (e.g. less than 2-3 custom projects), criticize their practical developer portfolio.
+  - Assess their profile handles (if provided) and explain what standing they need to target (e.g., LeetCode patterns, GitHub repository depth, Codeforces rating, Codementor reviews).
+- Provide concrete, step-by-step suggestions on how they can improve their profile standing, overcome their weaknesses, and how to execute each suggestion better.
 
 RETURN EXACTLY THIS JSON:
 {
   "verdict": "one harsh sentence about their current path",
   "wasted_time": ["skill1", "skill2"],
   "must_learn_now": [{"skill": "", "reason": ""}],
+  "lagging_areas": ["detailed list of where they are lagging behind based on their profiles, skills and goals"],
+  "improvement_suggestions": [{"action": "What they must do", "how_to_do_better": "Actionable, step-by-step instructions on how to do this action better"}],
   "priority_order": ["step1", "step2", "step3", "step4", "step5"],
   "brutal_truth": "2-3 sentence reality check paragraph",
   "action_this_week": "exact 1 thing they must do this week"
 }
 Return only valid JSON."""
 
+    if mentor_type == "coding":
+        user_content = "Please audit my coding standings and technical profile depth."
+        if leetcode_profile:
+            user_content += f"\nLeetCode Handle/URL: {leetcode_profile}"
+        else:
+            user_content += "\nLeetCode Handle/URL: Not configured"
+
+        if github_profile:
+            user_content += f"\nGitHub Handle/URL: {github_profile}"
+        else:
+            user_content += "\nGitHub Handle/URL: Not configured"
+
+        if codeforces_profile:
+            user_content += f"\nCodeforces Handle/URL: {codeforces_profile}"
+        else:
+            user_content += "\nCodeforces Handle/URL: Not configured"
+
+        if codementor_profile:
+            user_content += f"\nCodementor Handle/URL: {codementor_profile}"
+        else:
+            user_content += "\nCodementor Handle/URL: Not configured"
+
+        user_content += f"\n\nIn-App Algorithmic (DSA) Stats:"
+        user_content += f"\n- Total Solved Questions: {total_count}"
+        user_content += f"\n- Easy Solved: {easy_count}"
+        user_content += f"\n- Medium Solved: {medium_count}"
+        user_content += f"\n- Hard Solved: {hard_count}"
+        
+        if topic_counts:
+            topics_summary = ", ".join([f"{t} ({c} questions)" for t, c in topic_counts.items()])
+            user_content += f"\n- Solved Topics Distribution: {topics_summary}"
+        else:
+            user_content += "\n- Solved Topics Distribution: None recorded"
+
+        if dsa_progress:
+            titles = [(item.get("name") or item.get("title")) for item in dsa_progress if isinstance(item, dict) and (item.get("name") or item.get("title"))]
+            if titles:
+                user_content += f"\n- Solved Question List: {', '.join(titles)}"
+    else:
+        user_content = f"My goal: {goal}\nMy current skills: {current_skills}"
+        if leetcode_profile:
+            user_content += f"\nLeetCode Profile: {leetcode_profile}"
+        if github_profile:
+            user_content += f"\nGitHub Profile: {github_profile}"
+        if codeforces_profile:
+            user_content += f"\nCodeforces Profile: {codeforces_profile}"
+        if codementor_profile:
+            user_content += f"\nCodementor Profile: {codementor_profile}"
+
+        user_content += f"\n\nIn-App Learning & Performance Metrics:"
+        user_content += f"\n- DSA Progress: User has solved {len(dsa_progress)} practice problems inside the app."
+        if dsa_progress:
+            titles = [(item.get("name") or item.get("title")) for item in dsa_progress if isinstance(item, dict) and (item.get("name") or item.get("title"))]
+            if titles:
+                user_content += f" (Problems solved: {', '.join(titles[:15])}{'...' if len(titles) > 15 else ''})"
+
+        if resume_score is not None:
+            user_content += f"\n- Latest Resume Evaluation: ATS Score is {resume_score}/100."
+            if resume_suggestions:
+                tools = resume_suggestions.get("tools_to_learn", [])
+                if tools:
+                    user_content += f" (Suggestions to learn: {', '.join(tools[:5])})"
+        else:
+            user_content += f"\n- Latest Resume Evaluation: No resume uploaded yet in the app."
+
+        user_content += f"\n- Project Portfolio: User has configured {len(projects)} custom projects in their workspace."
+        if projects:
+            proj_titles = [p.get("title") for p in projects if isinstance(p, dict) and p.get("title")]
+            user_content += f" (Projects: {', '.join(proj_titles)})"
+
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"My goal: {goal}\nMy current skills: {current_skills}"}
+                {"role": "user", "content": user_content}
             ],
             temperature=0.4,
             response_format={"type": "json_object"}
@@ -1130,6 +1428,7 @@ def get_user_session():
         return jsonify({"logged_in": False}), 401
     return jsonify({
         "logged_in": True,
+        "id": session.get("user_id"),
         "email": session.get("user_email"),
         "name": session.get("user_name") or session.get("user_email").split("@")[0]
     })

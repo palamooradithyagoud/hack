@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS profiles (
     skill_level TEXT,
     preferred_learning_path TEXT,
     target_companies TEXT[],
+    leetcode_profile TEXT,
+    github_profile TEXT,
+    codeforces_profile TEXT,
+    codementor_profile TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
