@@ -7,3 +7,4 @@ pypdf>=4.0.0
 docx2txt>=0.8
 supabase>=2.3.0
 requests>=2.31.0
+gunicorn>=21.2.0
