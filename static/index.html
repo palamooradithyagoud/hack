@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillPath — Premium Career Accelerator</title>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-01N4B95WZ5"></script>
     <script>
@@ -10,15 +13,27 @@
 
       gtag('config', 'G-01N4B95WZ5');
     </script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SkillPath — Premium Career Accelerator</title>
     <!-- SEO -->
     <meta name="description" content="Discover curated YouTube playlists, professional certifications, and company-specific interview prep. AI-powered career recommendations.">
     <!-- Chart.js for Advanced Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Route Guard: Fast check for active Supabase Auth session token -->
+    <script>
+      (function() {
+        // If we are currently handling an OAuth/Supabase redirection callback, 
+        // bypass the route guard to let the Supabase SDK parse the tokens at the bottom of the page.
+        if (window.location.hash && (window.location.hash.includes('access_token=') || window.location.hash.includes('error='))) {
+          return;
+        }
+        const sessionKey = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+        if (!sessionKey || !localStorage.getItem(sessionKey)) {
+          window.location.href = '/login-page';
+        }
+      })();
+    </script>
 </head>
+
 <body>
 
     <div class="app-layout">
@@ -123,13 +138,13 @@
                                 </svg>
                                 <div class="progress-text-overlay">
                                     <span class="progress-pct" id="dashboard-progress-pct">0%</span>
-                                    <span class="progress-sub" id="dashboard-progress-count">0 / 500 topics</span>
+                                    <span class="progress-sub" id="dashboard-progress-count">0 / 500</span>
                                 </div>
                             </div>
                             <div class="progress-bars-list">
                                 <div class="p-bar-item">
                                     <div class="p-bar-labels">
-                                        <span>DSA</span>
+                                        <span id="dsa-progress-label-text">DSA</span>
                                         <span id="dsa-progress-label-pct">0%</span>
                                     </div>
                                     <div class="p-bar-track">
@@ -1156,7 +1171,7 @@
                                     Save Coding Profiles
                                 </button>
                             </div>
-                            <button class="btn-outline-primary" style="color:var(--danger); border-color:var(--danger); width:100%; height:44px; display:flex; align-items:center; justify-content:center; font-weight:600;" onclick="location.href='/logout'">
+                            <button class="btn-outline-primary" style="color:var(--danger); border-color:var(--danger); width:100%; height:44px; display:flex; align-items:center; justify-content:center; font-weight:600;" onclick="handleLogout()">
                                 Sign Out / Log Out
                             </button>
                         </div>
@@ -1177,12 +1192,6 @@
     <div id="toast" role="alert">
         <span id="toast-message">Oops! Something went wrong.</span>
     </div>
-
-    <!-- AI Assistant FAB -->
-    <a href="https://hackathon-for-ai-agent.vercel.app/" target="_blank" class="ai-assistant-fab" aria-label="Ask AI Assistant">
-        <span class="ai-icon">✨</span>
-        <span class="ai-label">Ask AI Doubts</span>
-    </a>
 
     <!-- Floating Brutal Mentor Mode Button & Modal (Optional/Fallback) -->
     <button id="mentor-mode-btn" title="Brutal AI Mentor" style="display:none;">
@@ -1214,5 +1223,20 @@
     </script>
     <script src="/static/js/supabaseClient.js"></script>
     <script src="/static/js/app.js"></script>
+    <script>
+        async function handleLogout() {
+            if (window.supabaseClient) {
+                try {
+                    await window.supabaseClient.auth.signOut();
+                } catch (e) {
+                    console.error("Failed to sign out via Supabase:", e);
+                }
+            }
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.href = '/login-page';
+        }
+    </script>
 </body>
 </html>
+

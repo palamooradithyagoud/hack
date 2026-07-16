@@ -1419,6 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Solved Questions State & Command Center Automation
      */
     let solvedDsaQuestions = [];
+    let leetcodeStats = null;
     
     const getSolvedQuestions = () => {
         return solvedDsaQuestions;
@@ -1449,8 +1450,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const solved = getSolvedQuestions();
         const GOAL = 500;
         
+        // Calculate Topic & Difficulty Counts
+        let localEasy = solved.filter(s => (s.difficulty || '').toLowerCase() === 'easy').length;
+        let localMedium = solved.filter(s => (s.difficulty || '').toLowerCase() === 'medium' || (s.difficulty || '').toLowerCase() === 'med').length;
+        let localHard = solved.filter(s => (s.difficulty || '').toLowerCase() === 'hard').length;
+        
+        const counts = { Easy: localEasy, Medium: localMedium, Hard: localHard };
+        if (leetcodeStats) {
+            counts.Easy = Math.max(counts.Easy, leetcodeStats.Easy || 0);
+            counts.Medium = Math.max(counts.Medium, leetcodeStats.Medium || 0);
+            counts.Hard = Math.max(counts.Hard, leetcodeStats.Hard || 0);
+        }
+        
         // 1. Calculate stats
-        const totalSolved = solved.length;
+        let totalSolved = Math.max(solved.length, counts.Easy + counts.Medium + counts.Hard);
+        if (leetcodeStats) {
+            totalSolved = Math.max(totalSolved, leetcodeStats.All || 0);
+        }
+        
         const completionPct = Math.min(100, Math.round((totalSolved / GOAL) * 100));
         const totalRevisions = solved.reduce((acc, s) => acc + (s.revisions || 0), 0);
         
@@ -1467,11 +1484,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Calculate Topic & Difficulty Counts
-        const counts = { Easy: 0, Medium: 0, Hard: 0 };
         const topicCounts = {};
         solved.forEach(s => {
-            counts[s.difficulty || 'Easy']++;
             topicCounts[s.topic || 'Misc'] = (topicCounts[s.topic || 'Misc'] || 0) + 1;
         });
 
@@ -1505,13 +1519,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const overallPct = overallTotal > 0 ? Math.min(100, Math.round((overallTopics / overallTotal) * 100)) : 0;
 
         progressPctText.textContent = `${overallPct}%`;
-        progressCountText.textContent = `${overallTopics} / ${overallTotal} topics`;
+        progressCountText.textContent = `${overallTopics} / ${overallTotal}`;
         
         // SVG Ring calculations (circumference = 314.16)
         const offset = 314.16 - (314.16 * overallPct / 100);
         progressRingBar.style.strokeDashoffset = offset;
 
         // Progress Bars Fill — DSA uses real data
+        const dsaLabelText = document.getElementById('dsa-progress-label-text');
+        if (dsaLabelText) {
+            dsaLabelText.textContent = `DSA (${totalSolved} solved)`;
+        }
         document.getElementById('dsa-progress-label-pct').textContent = `${dsaPct}%`;
         document.getElementById('dsa-progress-bar-fill').style.width = `${dsaPct}%`;
         
@@ -1658,7 +1676,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Calculate real distribution from solved DSA + saved playlists
         const solved = getSolvedQuestions();
         const savedPl = getSavedPlaylists();
-        const dsaCount = solved.length;
+        let dsaCount = solved.length;
+        if (leetcodeStats) {
+            dsaCount = Math.max(dsaCount, leetcodeStats.All || 0);
+        }
         const sdCount = savedPl.filter(p => (p.title + ' ' + (p.skill || '')).toLowerCase().includes('system')).length;
         const aiCount = savedPl.filter(p => /(ai|ml|machine|deep|neural)/i.test(p.title + ' ' + (p.skill || ''))).length;
         const devCount = savedPl.filter(p => {
@@ -1767,13 +1788,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const daysToFilter = timeframeEl ? timeframeEl.value : "30";
         
         // --- 2. CALCULATE KPI STATS ---
-        const totalSolved = solved.length;
+        let totalSolved = solved.length;
         const counts = { Easy: 0, Medium: 0, Hard: 0 };
         const topicCounts = {};
         solved.forEach(s => {
             counts[s.difficulty || 'Easy']++;
             topicCounts[s.topic || 'Misc'] = (topicCounts[s.topic || 'Misc'] || 0) + 1;
         });
+
+        if (leetcodeStats) {
+            counts.Easy = Math.max(counts.Easy, leetcodeStats.Easy || 0);
+            counts.Medium = Math.max(counts.Medium, leetcodeStats.Medium || 0);
+            counts.Hard = Math.max(counts.Hard, leetcodeStats.Hard || 0);
+            totalSolved = Math.max(totalSolved, leetcodeStats.All || 0);
+        }
         
         // Update Problems Solved UI
         const dsaCountEl = document.getElementById('analytics-dsa-count');
@@ -3221,20 +3249,27 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('profile_codeforces', codeforces);
         localStorage.setItem('profile_codementor', codementor);
 
-        // Save to DB
+        // Save to DB via backend endpoint (robust, bypasses client-side RLS issues)
         let dbSaved = false;
-        if (currentUserId && window.db) {
-            try {
-                await window.db.updateProfile(currentUserId, {
+        try {
+            const res = await fetch('/save-coding-profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     leetcode_profile: leetcode,
                     github_profile: github,
                     codeforces_profile: codeforces,
                     codementor_profile: codementor
-                });
-                dbSaved = true;
-            } catch (e) {
-                console.error("Failed to save coding profiles to Supabase:", e);
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'success') {
+                    dbSaved = true;
+                }
             }
+        } catch (e) {
+            console.error("Failed to save coding profiles via backend:", e);
         }
 
         if (dbSaved) {
@@ -3242,6 +3277,27 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             showToast('✅ Coding profiles saved locally (Cloud sync failed or pending schema migration).');
         }
+
+        if (leetcode) {
+            try {
+                showToast('🔄 Fetching live LeetCode stats...');
+                const res = await fetch(`/get-leetcode-stats?profile=${encodeURIComponent(leetcode)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.status === 'success' && data.stats) {
+                        leetcodeStats = data.stats;
+                        showToast(`📊 Loaded LeetCode solved count: ${leetcodeStats.All} questions!`);
+                    } else {
+                        showToast('⚠️ Could not load LeetCode solved count from profile.');
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch LeetCode stats on profile save:", e);
+            }
+        } else {
+            leetcodeStats = null;
+        }
+        renderDashboardProgress();
     };
 
     // Set Welcome back title initials and text
@@ -3295,6 +3351,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.error("Failed to fetch DSA progress from DB:", e);
         }
+
+        try {
+            const leetcode = localStorage.getItem('profile_leetcode') || "";
+            const url = leetcode ? `/get-leetcode-stats?profile=${encodeURIComponent(leetcode)}` : '/get-leetcode-stats';
+            const res = await fetch(url);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.status === 'success' && data.stats) {
+                    leetcodeStats = data.stats;
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch LeetCode stats on startup:", e);
+        }
+
         renderDashboardProgress();
     };
 

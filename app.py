@@ -9,9 +9,10 @@ import uuid
 import requests
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, request, jsonify, session, redirect, url_for
+from flask import Flask, request, jsonify, session, redirect, url_for, g
 from flask_cors import CORS
 from groq import Groq
+from functools import wraps
 try:
     from supabase import create_client, Client as SupabaseClient
 except ImportError:
@@ -25,15 +26,6 @@ except ImportError:
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.secret_key = os.getenv("SECRET_KEY", "skillpath-dev-secret-key-2024")
-
-# Configure secure cookie settings for production HTTPS (Vercel/Render)
-is_production = os.getenv("VERCEL") is not None or os.getenv("RENDER") is not None
-app.config.update(
-    SESSION_COOKIE_SECURE=is_production,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax'
-)
-
 CORS(app)
 
 # ──────────────────────────────────────────────
@@ -51,6 +43,41 @@ def get_sb():
             except Exception as e:
                 print(f"[DB] Supabase init failed: {e}")
     return _sb
+
+# ──────────────────────────────────────────────
+# Authentication Middleware (JWT Validation)
+# ──────────────────────────────────────────────
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            return jsonify({"error": "Authorization token is missing."}), 401
+        
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            return jsonify({"error": "Invalid authorization header format. Expected Bearer <token>"}), 401
+        
+        token = parts[1]
+        sb = get_sb()
+        if not sb:
+            return jsonify({"error": "Database service is unavailable."}), 500
+            
+        try:
+            res = sb.auth.get_user(token)
+            if not res or not res.user:
+                return jsonify({"error": "Invalid or expired session token."}), 401
+            
+            g.user = res.user
+            g.user_id = res.user.id
+            g.user_email = res.user.email
+        except Exception as e:
+            print(f"[AUTH] Token verification failed: {e}")
+            return jsonify({"error": "Unauthorized: Session is invalid or expired."}), 401
+            
+        return f(*args, **kwargs)
+    return decorated
+
 
 # ──────────────────────────────────────────────
 # DB Helper Functions
@@ -190,6 +217,7 @@ def extract_text_from_file(file) -> str:
         return ""
 
 @app.route("/analyze-resume", methods=["POST"])
+@token_required
 def analyze_resume():
     """Elite AI Resume Evaluator endpoint."""
     if "file" not in request.files:
@@ -296,7 +324,7 @@ STRICT RULES:
 
         # Save analysis to Supabase
         sb = get_sb()
-        user_id = session.get("user_id")
+        user_id = g.user_id
         if sb and user_id:
             try:
                 sb.table("resume_analysis").insert({
@@ -703,12 +731,13 @@ Do NOT return anything else. Ensure the JSON is valid."""
 # ──────────────────────────────────────────────
 
 @app.route("/get-resource", methods=["POST"])
+@token_required
 def get_resource():
     body = request.get_json(silent=True) or {}
     skill    = (body.get("skill") or "").strip()
     level    = (body.get("level") or "Beginner").strip()
     language = (body.get("language") or "English").strip()
-    sid      = body.get("session_id") or session.get("session_id") or "anonymous"
+    sid      = g.user_id
 
     if not skill:
         return jsonify({"error": "skill is required"}), 400
@@ -827,13 +856,15 @@ def get_resource():
 
 # ── STEP 6: Click / Save / Ignore Tracking ────────────────────────
 @app.route("/track-click", methods=["POST"])
+@token_required
 def track_click():
     body         = request.get_json(silent=True) or {}
     resource_url = (body.get("resource_url") or "").strip()
     skill_name   = (body.get("skill_name") or "").strip()
     resource_title = body.get("resource_title", "")
     action       = body.get("action", "click")   # click | save | ignore | complete | roadmap_view
-    sid          = body.get("session_id") or "anonymous"
+    sid          = g.user_id
+
 
     if not resource_url or not skill_name:
         return jsonify({"error": "resource_url and skill_name required"}), 400
@@ -907,11 +938,52 @@ def fetch_leetcode_graphql_stats(username):
                 return stats
     except Exception as e:
         print(f"[LEETCODE] GraphQL fetch failed for {username}: {e}")
+
+    # Fallback 1: Faisal Shohag API
+    try:
+        print(f"[LEETCODE] Trying Faisal Shohag API fallback for {username}...")
+        fallback_url = f"https://leetcode-api-faisalshohag.vercel.app/{username}"
+        res = requests.get(fallback_url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if "totalSolved" in data:
+                stats = {
+                    "All": data.get("totalSolved", 0),
+                    "Easy": data.get("easySolved", 0),
+                    "Medium": data.get("mediumSolved", 0),
+                    "Hard": data.get("hardSolved", 0)
+                }
+                print(f"[LEETCODE] Faisal Shohag fallback succeeded: {stats}")
+                return stats
+    except Exception as e:
+        print(f"[LEETCODE] Faisal Shohag fallback failed for {username}: {e}")
+
+    # Fallback 2: Alfa LeetCode API
+    try:
+        print(f"[LEETCODE] Trying Alfa LeetCode API fallback for {username}...")
+        fallback_url2 = f"https://alfa-leetcode-api.onrender.com/{username}/solved"
+        res = requests.get(fallback_url2, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if "solvedProblem" in data:
+                stats = {
+                    "All": data.get("solvedProblem", 0),
+                    "Easy": data.get("easySolved", 0),
+                    "Medium": data.get("mediumSolved", 0),
+                    "Hard": data.get("hardSolved", 0)
+                }
+                print(f"[LEETCODE] Alfa LeetCode fallback succeeded: {stats}")
+                return stats
+    except Exception as e:
+        print(f"[LEETCODE] Alfa LeetCode fallback failed for {username}: {e}")
+
     return None
 
 # ── STEP 9: Brutal Mentor Mode ────────────────────────────────────
 @app.route("/mentor-mode", methods=["POST"])
+@token_required
 def mentor_mode():
+
     body               = request.get_json(silent=True) or {}
     goal               = (body.get("goal") or "").strip()
     current_skills     = (body.get("current_skills") or "").strip()
@@ -923,7 +995,7 @@ def mentor_mode():
     if not goal:
         return jsonify({"error": "goal is required"}), 400
 
-    user_id = session.get("user_id")
+    user_id = g.user_id
     sb = get_sb()
 
     # Pre-populate empty profiles from database if they exist
@@ -1341,118 +1413,44 @@ def get_questions():
 
 @app.route("/login-page")
 def login_page():
-    if session.get("logged_in"):
-        return redirect("/")
     return app.send_static_file("login.html")
 
-@app.route("/login", methods=["POST"])
-def login():
-    data     = request.get_json(silent=True) or {}
-    email    = (data.get("email") or "").strip()
-    password = (data.get("password") or "").strip()
-
-    if not email or not password:
-        return jsonify({"error": "Email and password are required."}), 400
-
-    import re
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return jsonify({"error": "Invalid email address."}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters."}), 400
-
-    session["logged_in"] = True
-    session["user_email"] = email
-
-    # Fetch or create profile in Supabase
-    sb = get_sb()
-    if sb:
-        try:
-            res = sb.table("profiles").select("id, full_name").eq("email", email).execute()
-            if res.data:
-                session["user_id"] = res.data[0]["id"]
-                session["user_name"] = res.data[0]["full_name"]
-            else:
-                user_id = str(uuid.uuid4())
-                name = email.split("@")[0].capitalize()
-                sb.table("profiles").insert({
-                    "id": user_id,
-                    "full_name": name,
-                    "email": email
-                }).execute()
-                session["user_id"] = user_id
-                session["user_name"] = name
-        except Exception as e:
-            print(f"[AUTH] Supabase profile sync failed: {e}")
-            # Fallback to email prefix
-            session["user_name"] = email.split("@")[0].capitalize()
-    else:
-        session["user_name"] = email.split("@")[0].capitalize()
-
-    return jsonify({"success": True})
-
-@app.route("/signup", methods=["POST"])
-def signup():
-    data     = request.get_json(silent=True) or {}
-    name     = (data.get("name") or "").strip()
-    email    = (data.get("email") or "").strip()
-    password = (data.get("password") or "").strip()
-
-    if not name or not email or not password:
-        return jsonify({"error": "All fields are required."}), 400
-
-    import re
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return jsonify({"error": "Invalid email address."}), 400
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters."}), 400
-
-    session["logged_in"] = True
-    session["user_email"] = email
-    session["user_name"]  = name
-
-    # Create profile in Supabase
-    sb = get_sb()
-    if sb:
-        try:
-            user_id = str(uuid.uuid4())
-            sb.table("profiles").insert({
-                "id": user_id,
-                "full_name": name,
-                "email": email
-            }).execute()
-            session["user_id"] = user_id
-        except Exception as e:
-            print(f"[AUTH] Supabase profile signup failed: {e}")
-
-    return jsonify({"success": True})
+@app.route("/config", methods=["GET"])
+def get_config():
+    return jsonify({
+        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
+        "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY")
+    })
 
 @app.route("/logout")
 def logout():
-    session.clear()
     return redirect("/login-page")
 
 @app.route("/get-user-session", methods=["GET"])
+@token_required
 def get_user_session():
-    if not session.get("logged_in"):
-        return jsonify({"logged_in": False}), 401
+    name = g.user.user_metadata.get("full_name") if g.user.user_metadata else None
+    if not name:
+        name = g.user_email.split("@")[0].capitalize()
     return jsonify({
         "logged_in": True,
-        "id": session.get("user_id"),
-        "email": session.get("user_email"),
-        "name": session.get("user_name") or session.get("user_email").split("@")[0]
+        "id": g.user_id,
+        "email": g.user_email,
+        "name": name
     })
 
+
 @app.route("/get-latest-resume", methods=["GET"])
+@token_required
 def get_latest_resume():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify(None)
+    pass
     sb = get_sb()
     if not sb:
         return jsonify(None)
     try:
         res = sb.table("resume_analysis")\
                 .select("*")\
-                .eq("user_id", session["user_id"])\
+                .eq("user_id", g.user_id)\
                 .order("created_at", desc=True)\
                 .limit(1)\
                 .execute()
@@ -1470,9 +1468,9 @@ def get_latest_resume():
         return jsonify(None)
 
 @app.route("/sync-dsa-progress", methods=["POST"])
+@token_required
 def sync_dsa_progress():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     body = request.get_json(silent=True) or {}
     solved_list = body.get("solved_list", [])
     
@@ -1488,16 +1486,16 @@ def sync_dsa_progress():
         
         # Sync to learning_progress
         sb.table("learning_progress").upsert({
-            "session_id": session["user_id"],
+            "session_id": g.user_id,
             "skill_name": "dsa",
             "completed_steps": solved_list,
             "completion_pct": min(100.0, float(total) / 500 * 100)
         }, on_conflict="session_id, skill_name").execute()
         
         # Sync to dsa_progress
-        dsa_res = sb.table("dsa_progress").select("id").eq("user_id", session["user_id"]).limit(1).execute()
+        dsa_res = sb.table("dsa_progress").select("id").eq("user_id", g.user_id).limit(1).execute()
         dsa_row = {
-            "user_id": session["user_id"],
+            "user_id": g.user_id,
             "total_solved": total,
             "easy_solved": easy,
             "medium_solved": medium,
@@ -1514,16 +1512,16 @@ def sync_dsa_progress():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-dsa-progress", methods=["GET"])
+@token_required
 def get_dsa_progress():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify([])
+    pass
     sb = get_sb()
     if not sb:
         return jsonify([])
     try:
         res = sb.table("learning_progress")\
                 .select("completed_steps")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", "dsa")\
                 .limit(1)\
                 .execute()
@@ -1534,10 +1532,117 @@ def get_dsa_progress():
         print(f"[DSA] Get failed: {e}")
         return jsonify([])
 
+
+@app.route("/get-leetcode-stats", methods=["GET"])
+@token_required
+def get_leetcode_stats():
+    sb = get_sb()
+    if not sb:
+        return jsonify({"error": "DB unavailable"}), 500
+    try:
+        # Check if profile link was passed as a query parameter
+        leetcode_profile = request.args.get("profile")
+        
+        if not leetcode_profile:
+            # Fetch user's profile to get leetcode_profile from DB
+            res = sb.table("profiles").select("leetcode_profile").eq("id", g.user_id).single().execute()
+            leetcode_profile = res.data.get("leetcode_profile") if res.data else None
+            
+        if not leetcode_profile:
+            return jsonify({"status": "no_profile", "message": "LeetCode profile not configured."})
+            
+        username = extract_leetcode_username(leetcode_profile)
+        stats = fetch_leetcode_graphql_stats(username)
+        
+        if stats:
+            # Sync to profiles table on the backend (service role key bypasses client RLS)
+            try:
+                sb.table("profiles").update({"leetcode_profile": leetcode_profile}).eq("id", g.user_id).execute()
+                print(f"[LEETCODE] Successfully synced profile URL '{leetcode_profile}' to profiles table.")
+            except Exception as prof_err:
+                print(f"[LEETCODE] Sync to profiles table failed: {prof_err}")
+
+            # Sync to dsa_progress table
+            easy = stats.get("Easy", 0)
+            medium = stats.get("Medium", 0)
+            hard = stats.get("Hard", 0)
+            total = stats.get("All", 0)
+            
+            dsa_res = sb.table("dsa_progress").select("id").eq("user_id", g.user_id).limit(1).execute()
+            dsa_row = {
+                "user_id": g.user_id,
+                "total_solved": total,
+                "easy_solved": easy,
+                "medium_solved": medium,
+                "hard_solved": hard
+            }
+            if dsa_res.data:
+                sb.table("dsa_progress").update(dsa_row).eq("id", dsa_res.data[0]["id"]).execute()
+            else:
+                sb.table("dsa_progress").insert(dsa_row).execute()
+                
+            return jsonify({
+                "status": "success",
+                "username": username,
+                "stats": stats,
+                "source": "live"
+            })
+            
+        # Fallback to database cached counts if live fetch failed
+        dsa_res = sb.table("dsa_progress").select("*").eq("user_id", g.user_id).limit(1).execute()
+        if dsa_res.data:
+            row = dsa_res.data[0]
+            cached_stats = {
+                "All": row.get("total_solved", 0),
+                "Easy": row.get("easy_solved", 0),
+                "Medium": row.get("medium_solved", 0),
+                "Hard": row.get("hard_solved", 0)
+            }
+            return jsonify({
+                "status": "success",
+                "username": username,
+                "stats": cached_stats,
+                "source": "cache"
+            })
+            
+        return jsonify({"status": "error", "message": "Failed to fetch stats from LeetCode and no cache found."})
+    except Exception as e:
+        print(f"[LEETCODE] Endpoint failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/save-coding-profiles", methods=["POST"])
+@token_required
+def save_coding_profiles():
+    sb = get_sb()
+    if not sb:
+        return jsonify({"error": "DB unavailable"}), 500
+    try:
+        body = request.get_json(silent=True) or {}
+        leetcode = body.get("leetcode_profile", "").strip()
+        github = body.get("github_profile", "").strip()
+        codeforces = body.get("codeforces_profile", "").strip()
+        codementor = body.get("codementor_profile", "").strip()
+        
+        # Update profiles table on the backend
+        res = sb.table("profiles").update({
+            "leetcode_profile": leetcode,
+            "github_profile": github,
+            "codeforces_profile": codeforces,
+            "codementor_profile": codementor
+        }).eq("id", g.user_id).execute()
+        
+        print(f"[PROFILES] Backend successfully updated profiles for user {g.user_id}.")
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"[PROFILES] Backend save failed: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/sync-user-projects", methods=["POST"])
+@token_required
 def sync_user_projects():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     body = request.get_json(silent=True) or {}
     projects_list = body.get("projects_list", [])
     
@@ -1547,7 +1652,7 @@ def sync_user_projects():
         
     try:
         sb.table("learning_progress").upsert({
-            "session_id": session["user_id"],
+            "session_id": g.user_id,
             "skill_name": "user_projects",
             "completed_steps": projects_list,
             "completion_pct": 100.0
@@ -1558,16 +1663,16 @@ def sync_user_projects():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-user-projects", methods=["GET"])
+@token_required
 def get_user_projects():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify([])
+    pass
     sb = get_sb()
     if not sb:
         return jsonify([])
     try:
         res = sb.table("learning_progress")\
                 .select("completed_steps")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", "user_projects")\
                 .limit(1)\
                 .execute()
@@ -1579,9 +1684,9 @@ def get_user_projects():
         return jsonify([])
 
 @app.route("/sync-saved-playlists", methods=["POST"])
+@token_required
 def sync_saved_playlists():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     body = request.get_json(silent=True) or {}
     playlists_list = body.get("playlists_list", [])
     
@@ -1603,7 +1708,7 @@ def sync_saved_playlists():
             pct = round((completed_videos / total_videos) * 100.0, 2)
 
         sb.table("learning_progress").upsert({
-            "session_id": session["user_id"],
+            "session_id": g.user_id,
             "skill_name": "saved_playlists",
             "completed_steps": playlists_list,
             "completion_pct": pct
@@ -1614,16 +1719,16 @@ def sync_saved_playlists():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-saved-playlists", methods=["GET"])
+@token_required
 def get_saved_playlists():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify([])
+    pass
     sb = get_sb()
     if not sb:
         return jsonify([])
     try:
         res = sb.table("learning_progress")\
                 .select("completed_steps")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", "saved_playlists")\
                 .limit(1)\
                 .execute()
@@ -1635,9 +1740,9 @@ def get_saved_playlists():
         return jsonify([])
 
 @app.route("/sync-active-roadmap", methods=["POST"])
+@token_required
 def sync_active_roadmap():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     body = request.get_json(silent=True) or {}
     
     sb = get_sb()
@@ -1647,7 +1752,7 @@ def sync_active_roadmap():
     try:
         if not body:
             # Untrack roadmap by deleting active_roadmap row
-            sb.table("learning_progress").delete().eq("session_id", session["user_id"]).eq("skill_name", "active_roadmap").execute()
+            sb.table("learning_progress").delete().eq("session_id", g.user_id).eq("skill_name", "active_roadmap").execute()
             return jsonify({"status": "success"})
 
         skill = body.get("skill")
@@ -1662,7 +1767,7 @@ def sync_active_roadmap():
         }
         
         sb.table("learning_progress").upsert({
-            "session_id": session["user_id"],
+            "session_id": g.user_id,
             "skill_name": "active_roadmap",
             "completed_steps": roadmap_data,
             "completion_pct": pct
@@ -1673,16 +1778,16 @@ def sync_active_roadmap():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-active-roadmap", methods=["GET"])
+@token_required
 def get_active_roadmap():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify(None)
+    pass
     sb = get_sb()
     if not sb:
         return jsonify(None)
     try:
         res = sb.table("learning_progress")\
                 .select("completed_steps, completion_pct")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", "active_roadmap")\
                 .limit(1)\
                 .execute()
@@ -1697,9 +1802,9 @@ def get_active_roadmap():
         return jsonify(None)
 
 @app.route("/add-milestone", methods=["POST"])
+@token_required
 def add_milestone():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     body = request.get_json(silent=True) or {}
     skill_name = body.get("skill_name")
     outcome_type = body.get("outcome_type", "roadmap_complete")
@@ -1716,7 +1821,7 @@ def add_milestone():
         # Check if duplicate milestone already exists
         res = sb.table("success_metrics")\
                 .select("id")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", skill_name)\
                 .eq("outcome_type", outcome_type)\
                 .limit(1)\
@@ -1727,7 +1832,7 @@ def add_milestone():
             
         # Insert new milestone
         sb.table("success_metrics").insert({
-            "session_id": session["user_id"],
+            "session_id": g.user_id,
             "skill_name": skill_name,
             "outcome_type": outcome_type,
             "outcome_detail": outcome_detail
@@ -1739,16 +1844,16 @@ def add_milestone():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/get-milestones", methods=["GET"])
+@token_required
 def get_milestones():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify([])
+    pass
     sb = get_sb()
     if not sb:
         return jsonify([])
     try:
         res = sb.table("success_metrics")\
                 .select("*")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .order("created_at", desc=True)\
                 .execute()
         return jsonify(res.data or [])
@@ -1757,16 +1862,16 @@ def get_milestones():
         return jsonify([])
 
 @app.route("/generate-competency-audit", methods=["POST"])
+@token_required
 def generate_competency_audit():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     
     sb = get_sb()
     if not sb:
         return jsonify({"error": "Database connection not active"}), 500
         
     try:
-        user_id = session["user_id"]
+        user_id = g.user_id
         
         # 1. Fetch DSA progress
         dsa_data = {"total_solved": 0, "easy_solved": 0, "medium_solved": 0, "hard_solved": 0, "weak_topics": []}
@@ -1920,16 +2025,16 @@ STRICT RULES:
         return jsonify({"error": "Failed to generate competency audit. Ensure you are logged in and database connection is active."}), 500
 
 @app.route("/get-competency-audit", methods=["GET"])
+@token_required
 def get_competency_audit():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify(None)
+    pass
     sb = get_sb()
     if not sb:
         return jsonify(None)
     try:
         res = sb.table("learning_progress")\
                 .select("completed_steps")\
-                .eq("session_id", session["user_id"])\
+                .eq("session_id", g.user_id)\
                 .eq("skill_name", "competency_audit")\
                 .limit(1)\
                 .execute()
@@ -1945,9 +2050,9 @@ def get_competency_audit():
 # ──────────────────────────────────────────────
 
 @app.route("/generate-mock-interview", methods=["POST"])
+@token_required
 def generate_mock_interview():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     
     body = request.get_json(silent=True) or {}
     role = (body.get("role") or "Software Engineer").strip()
@@ -1995,9 +2100,9 @@ STRICT RULES:
 
 
 @app.route("/respond-mock-interview", methods=["POST"])
+@token_required
 def respond_mock_interview():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     
     body = request.get_json(silent=True) or {}
     role = (body.get("role") or "Software Engineer").strip()
@@ -2067,9 +2172,9 @@ The JSON structure MUST be exactly:
 
 
 @app.route("/evaluate-mock-interview", methods=["POST"])
+@token_required
 def evaluate_mock_interview():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     
     body = request.get_json(silent=True) or {}
     role = (body.get("role") or "Software Engineer").strip()
@@ -2130,7 +2235,7 @@ The JSON structure MUST be exactly:
         
         # Save to Supabase
         sb = get_sb()
-        user_id = session.get("user_id")
+        user_id = g.user_id
         if sb and user_id:
             try:
                 # Weak areas as list of strings
@@ -2157,16 +2262,16 @@ The JSON structure MUST be exactly:
 
 
 @app.route("/get-interview-history", methods=["GET"])
+@token_required
 def get_interview_history():
-    if not session.get("logged_in") or not session.get("user_id"):
-        return jsonify({"error": "Unauthorized"}), 401
+    pass
     
     sb = get_sb()
     if not sb:
         return jsonify([])
         
     try:
-        user_id = session.get("user_id")
+        user_id = g.user_id
         res = sb.table("interview_progress")\
                 .select("*")\
                 .eq("user_id", user_id)\
@@ -2180,9 +2285,9 @@ def get_interview_history():
 
 @app.route("/")
 def index():
-    if not session.get("logged_in"):
-        return redirect("/login-page")
+    pass
     return app.send_static_file("index.html")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.getenv("PORT", 3000))
+    app.run(debug=True, host="0.0.0.0", port=port)
