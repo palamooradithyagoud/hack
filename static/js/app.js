@@ -3529,15 +3529,99 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryName = document.getElementById('profile-user-name');
         if (summaryName) summaryName.textContent = name || "Loading...";
 
-        const setSummaryText = (summaryId, val) => {
-            const el = document.getElementById(summaryId);
-            if (el) {
-                el.textContent = val ? val : "Not configured 🛑";
-                el.style.color = val ? "var(--text-main)" : "var(--danger)";
+        // Fetch and update LeetCode solved count and GitHub repos count
+        updateSettingsSyncStats(leetcode, github);
+    };
+
+    // Helper to fetch and display synced LeetCode & GitHub stats on Settings
+    const updateSettingsSyncStats = async (leetcode, github) => {
+        const summaryLeetCode = document.getElementById('summary-leetcode');
+        const summaryGitHub = document.getElementById('summary-github');
+
+        if (leetcode) {
+            if (summaryLeetCode) {
+                summaryLeetCode.textContent = "Loading stats... 🔄";
+                summaryLeetCode.style.color = "var(--text-muted)";
             }
-        };
-        setSummaryText('summary-leetcode', leetcode);
-        setSummaryText('summary-github', github);
+            try {
+                let cleanLC = leetcode.trim();
+                if (cleanLC.includes('leetcode.com/u/')) {
+                    cleanLC = cleanLC.split('leetcode.com/u/').pop().split('/')[0];
+                } else if (cleanLC.includes('leetcode.com/')) {
+                    cleanLC = cleanLC.split('leetcode.com/').pop().split('/')[0];
+                }
+                const res = await fetch(`/get-leetcode-stats?profile=${encodeURIComponent(cleanLC)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.status === 'success' && data.stats) {
+                        const solved = data.stats.All || 0;
+                        if (summaryLeetCode) {
+                            summaryLeetCode.textContent = `${solved} Solved ✅`;
+                            summaryLeetCode.style.color = "var(--primary)";
+                        }
+                    } else {
+                        if (summaryLeetCode) {
+                            summaryLeetCode.textContent = `Synced (${cleanLC}) ⚠️`;
+                            summaryLeetCode.style.color = "var(--text-main)";
+                        }
+                    }
+                } else {
+                    if (summaryLeetCode) {
+                        summaryLeetCode.textContent = `Synced (${cleanLC}) ⚠️`;
+                        summaryLeetCode.style.color = "var(--text-main)";
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch LC stats on settings open:", e);
+                if (summaryLeetCode) {
+                    summaryLeetCode.textContent = `Synced (${leetcode}) ⚠️`;
+                    summaryLeetCode.style.color = "var(--text-main)";
+                }
+            }
+        } else {
+            if (summaryLeetCode) {
+                summaryLeetCode.textContent = "Not configured 🛑";
+                summaryLeetCode.style.color = "var(--danger)";
+            }
+        }
+
+        if (github) {
+            if (summaryGitHub) {
+                summaryGitHub.textContent = "Loading repos... 🔄";
+                summaryGitHub.style.color = "var(--text-muted)";
+            }
+            try {
+                let cleanGH = github.trim();
+                if (cleanGH.includes('github.com/')) {
+                    cleanGH = cleanGH.split('github.com/').pop().split('/')[0];
+                }
+                const res = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanGH)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const repos = data.public_repos !== undefined ? data.public_repos : 0;
+                    if (summaryGitHub) {
+                        summaryGitHub.textContent = `${repos} Repos ✅`;
+                        summaryGitHub.style.color = "var(--primary)";
+                    }
+                } else {
+                    if (summaryGitHub) {
+                        summaryGitHub.textContent = `Synced (${cleanGH}) ⚠️`;
+                        summaryGitHub.style.color = "var(--text-main)";
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch GitHub repos on settings open:", e);
+                if (summaryGitHub) {
+                    summaryGitHub.textContent = `Synced (${github}) ⚠️`;
+                    summaryGitHub.style.color = "var(--text-main)";
+                }
+            }
+        } else {
+            if (summaryGitHub) {
+                summaryGitHub.textContent = "Not configured 🛑";
+                summaryGitHub.style.color = "var(--danger)";
+            }
+        }
     };
 
     const saveCodingProfiles = async () => {
@@ -3576,15 +3660,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const summaryName = document.getElementById('profile-user-name');
         if (summaryName) summaryName.textContent = name || "Not configured";
 
-        const setSummaryText = (summaryId, val) => {
-            const el = document.getElementById(summaryId);
-            if (el) {
-                el.textContent = val ? val : "Not configured 🛑";
-                el.style.color = val ? "var(--text-main)" : "var(--danger)";
-            }
-        };
-        setSummaryText('summary-leetcode', leetcode);
-        setSummaryText('summary-github', github);
+        // Update LeetCode and GitHub stats immediately
+        updateSettingsSyncStats(leetcode, github);
 
         // Save to DB via backend endpoint (robust, bypasses client-side RLS issues)
         let dbSaved = false;
@@ -3627,15 +3704,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (leetcode) {
             try {
-                showToast('🔄 Fetching live LeetCode stats...');
                 const res = await fetch(`/get-leetcode-stats?profile=${encodeURIComponent(leetcode)}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.status === 'success' && data.stats) {
                         leetcodeStats = data.stats;
-                        showToast(`📊 Loaded LeetCode solved count: ${leetcodeStats.All} questions!`);
-                    } else {
-                        showToast('⚠️ Could not load LeetCode solved count from profile.');
                     }
                 }
             } catch (e) {
