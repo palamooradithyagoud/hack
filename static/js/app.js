@@ -1,7 +1,49 @@
-/**
- * SkillRecommender — Premium SaaS Frontend Logic
+﻿/**
+ * SkillRecommender â€” Premium SaaS Frontend Logic
  * Strictly Vanilla JS (no frameworks)
  */
+
+/**
+ * authFetch â€” Drop-in replacement for fetch() that automatically
+ * attaches the Supabase JWT Bearer token to every API request.
+ * This is required for all @token_required endpoints on the backend.
+ */
+async function authFetch(url, options = {}) {
+    let token = null;
+
+    // Try to get the live session token from the Supabase client SDK
+    if (window.supabaseClient) {
+        try {
+            const { data } = await window.supabaseClient.auth.getSession();
+            token = data?.session?.access_token || null;
+        } catch (e) {
+            console.warn('[authFetch] Could not get Supabase session:', e);
+        }
+    }
+
+    // Fallback: parse token directly from localStorage if SDK call fails
+    if (!token) {
+        try {
+            const sessionKey = Object.keys(localStorage).find(
+                k => k.startsWith('sb-') && k.endsWith('-auth-token')
+            );
+            if (sessionKey) {
+                const raw = JSON.parse(localStorage.getItem(sessionKey));
+                token = raw?.access_token || null;
+            }
+        } catch (e) {
+            console.warn('[authFetch] Could not parse token from localStorage:', e);
+        }
+    }
+
+    // Merge Authorization header into request options
+    const headers = {
+        ...(options.headers || {}),
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    return fetch(url, { ...options, headers });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Selectors
@@ -141,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remove it
             savedPlaylists.splice(index, 1);
             if (btnEl) {
-                btnEl.textContent = '💾 Save';
+                btnEl.textContent = 'ðŸ’¾ Save';
                 btnEl.classList.remove('saved');
             }
             showToast('Removed from saved playlists');
@@ -149,12 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSavedPlaylists();
             updateCommandCenter();
         } else {
-            // Add it — fetch real videos from YouTube API
+            // Add it â€” fetch real videos from YouTube API
             playlist.savedAt = new Date().toISOString();
             playlist.completed = false;
 
             if (btnEl) {
-                btnEl.textContent = '⏳ Loading...';
+                btnEl.textContent = 'â³ Loading...';
                 btnEl.disabled = true;
             }
 
@@ -177,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             savedPlaylists.push(playlist);
             if (btnEl) {
-                btnEl.textContent = '✅ Saved';
+                btnEl.textContent = 'âœ… Saved';
                 btnEl.classList.add('saved');
                 btnEl.disabled = false;
             }
@@ -253,14 +295,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Also update any visible buttons on screen
         document.querySelectorAll(`.btn-save-playlist[data-url="${url}"]`).forEach(btn => {
-            btn.textContent = '💾 Save';
+            btn.textContent = 'ðŸ’¾ Save';
             btn.classList.remove('saved');
         });
     };
 
     const syncSavedPlaylists = async (savedList) => {
         try {
-            await fetch('/sync-saved-playlists', {
+            await authFetch('/sync-saved-playlists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ playlists_list: savedList })
@@ -308,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="saved-playlist-actions" style="margin-left: auto;">
                         <label class="saved-playlist-check">
                             <input type="checkbox" class="playlist-complete-checkbox" data-url="${escapeHTML(p.url)}" ${p.completed ? 'checked' : ''}>
-                            <span>${p.completed ? '✅ Done' : 'Mark Done'}</span>
+                            <span>${p.completed ? 'âœ… Done' : 'Mark Done'}</span>
                         </label>
                         <a href="${p.url}" target="_blank" class="btn-watch" style="padding: 6px 12px; font-size: 0.75rem; border-radius: var(--radius-sm);">Watch</a>
                         <button class="btn-remove-saved" data-url="${escapeHTML(p.url)}">Delete</button>
@@ -325,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${completedCount} of ${totalCount} videos completed (${progressPct}%)
                         </span>
                         <button class="saved-playlist-videos-toggle" data-expanded="false" style="font-size:0.75rem; color:var(--primary); background:none; border:none; cursor:pointer; font-weight:700;">
-                            ▼ Show Videos (${totalCount})
+                            â–¼ Show Videos (${totalCount})
                         </button>
                     </div>
                 </div>
@@ -336,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="playlist-video-item ${v.completed ? 'completed' : ''}">
                             <input type="checkbox" class="video-checkbox" data-video-id="${v.id}" ${v.completed ? 'checked' : ''}>
                             <span>${v.id}. ${escapeHTML(v.title)}</span>
-                            ${v.videoId ? `<a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank" class="video-play-link" title="Watch on YouTube">▶</a>` : ''}
+                            ${v.videoId ? `<a href="https://www.youtube.com/watch?v=${v.videoId}" target="_blank" class="video-play-link" title="Watch on YouTube">â–¶</a>` : ''}
                         </label>
                     `).join('')}
                 </div>
@@ -350,11 +392,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isExpanded) {
                     videosList.style.display = 'none';
                     toggleBtn.setAttribute('data-expanded', 'false');
-                    toggleBtn.textContent = `▼ Show Videos (${totalCount})`;
+                    toggleBtn.textContent = `â–¼ Show Videos (${totalCount})`;
                 } else {
                     videosList.style.display = 'flex';
                     toggleBtn.setAttribute('data-expanded', 'true');
-                    toggleBtn.textContent = `▲ Hide Videos`;
+                    toggleBtn.textContent = `â–² Hide Videos`;
                 }
             });
 
@@ -381,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initSavedPlaylists = async () => {
         try {
-            const res = await fetch('/get-saved-playlists');
+            const res = await authFetch('/get-saved-playlists');
             if (res.ok) {
                 const list = await res.json();
                 if (Array.isArray(list)) {
@@ -404,10 +446,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSavedPlaylists();
     };
 
-    // ── ACTIVE ROADMAP TRACKING SYSTEM ──
+    // â”€â”€ ACTIVE ROADMAP TRACKING SYSTEM â”€â”€
     const initActiveRoadmap = async () => {
         try {
-            const res = await fetch('/get-active-roadmap');
+            const res = await authFetch('/get-active-roadmap');
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.skill && data.steps) {
@@ -468,12 +510,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (checklist) {
             checklist.innerHTML = '';
             const phases = [
-                { key: 'beginner', label: '🌱 Beginner Phase' },
-                { key: 'intermediate', label: '🔥 Intermediate Phase' },
-                { key: 'advanced', label: '🚀 Advanced Phase' },
-                { key: 'projects', label: '🛠️ Projects to Build' },
-                { key: 'certifications', label: '🏆 Recommended Certifications' },
-                { key: 'interview_prep', label: '💼 Interview Prep Focus' }
+                { key: 'beginner', label: 'ðŸŒ± Beginner Phase' },
+                { key: 'intermediate', label: 'ðŸ”¥ Intermediate Phase' },
+                { key: 'advanced', label: 'ðŸš€ Advanced Phase' },
+                { key: 'projects', label: 'ðŸ› ï¸ Projects to Build' },
+                { key: 'certifications', label: 'ðŸ† Recommended Certifications' },
+                { key: 'interview_prep', label: 'ðŸ’¼ Interview Prep Focus' }
             ];
 
             phases.forEach(phase => {
@@ -526,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const toggledStep = activeRoadmap.steps.find(s => s.id === stepId);
         if (toggledStep && toggledStep.phaseKey === 'projects') {
             try {
-                const res = await fetch('/get-user-projects');
+                const res = await authFetch('/get-user-projects');
                 if (res.ok) {
                     const plist = await res.json();
                     if (Array.isArray(plist)) {
@@ -568,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sync with backend
         try {
-            await fetch('/sync-active-roadmap', {
+            await authFetch('/sync-active-roadmap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -582,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // If checked to 100% completion, automatically log milestone achievement
             if (pct === 100) {
                 const milestoneDetail = `Completed ${activeRoadmap.skill} (${activeRoadmap.level}) roadmap!`;
-                await fetch('/add-milestone', {
+                await authFetch('/add-milestone', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -606,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Milestones tracking
     const initProfileMilestones = async () => {
         try {
-            const res = await fetch('/get-milestones');
+            const res = await authFetch('/get-milestones');
             if (res.ok) {
                 const list = await res.json();
                 renderMilestones(list);
@@ -622,7 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const html = list.length > 0 ? list.map(m => `
             <div style="background:var(--bg-main); border:1px solid var(--border); padding:14px 18px; border-radius:var(--radius-md); display:flex; align-items:center; gap:14px;">
-                <span style="font-size:1.6rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));">🏆</span>
+                <span style="font-size:1.6rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));">ðŸ†</span>
                 <div style="display:flex; flex-direction:column; gap:3px;">
                     <strong style="color:var(--text-main); font-size:0.925rem; line-height:1.3;">${escapeHTML(m.outcome_detail || m.skill_name)}</strong>
                      <span style="color:var(--text-muted); font-size:0.75rem;">Earned ${new Date(m.created_at).toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'})}</span>
@@ -638,10 +680,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const analyticsHtml = list.length > 0 ? list.map(m => `
             <div style="background:var(--bg-card); border:1px solid var(--border); padding:16px 20px; border-radius:var(--radius-lg); display:flex; align-items:center; gap:16px; box-shadow:var(--shadow-card); margin-bottom:12px;">
-                <div style="font-size:2rem; background:rgba(37,99,235,0.08); width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">🏆</div>
+                <div style="font-size:2rem; background:rgba(37,99,235,0.08); width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">ðŸ†</div>
                 <div style="display:flex; flex-direction:column; gap:4px; flex-grow:1;">
                     <strong style="color:var(--text-main); font-size:1rem; font-family:'Outfit',sans-serif;">${escapeHTML(m.outcome_detail || m.skill_name)}</strong>
-                    <span style="color:var(--text-muted); font-size:0.8rem;">Career Milestone Achievement • Completed on ${new Date(m.created_at).toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">Career Milestone Achievement â€¢ Completed on ${new Date(m.created_at).toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'})}</span>
                 </div>
             </div>
         `).join('') : `
@@ -718,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sync with backend
         try {
-            await fetch('/sync-active-roadmap', {
+            await authFetch('/sync-active-roadmap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -745,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderStep('roadmap');
 
         try {
-            await fetch('/sync-active-roadmap', {
+            await authFetch('/sync-active-roadmap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(null)
@@ -820,11 +862,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tierLabelBadge) tierLabelBadge.textContent = data.tier_label || '';
 
             if (data.tier === 0) {
-                tierIndicator.textContent = '⚡ Instant Result: Retrieved from AI Memory';
+                tierIndicator.textContent = 'âš¡ Instant Result: Retrieved from AI Memory';
             } else if (data.tier === 1) {
-                tierIndicator.textContent = '🚀 Curated Result: Trusted CSV Dataset';
+                tierIndicator.textContent = 'ðŸš€ Curated Result: Trusted CSV Dataset';
             } else if (data.tier >= 3) {
-                tierIndicator.textContent = '🧠 AI-Ranked Result: Groq Intelligence Engine';
+                tierIndicator.textContent = 'ðŸ§  AI-Ranked Result: Groq Intelligence Engine';
             } else {
                 tierIndicator.textContent = 'The best free curated playlists to build your foundation.';
             }
@@ -846,7 +888,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             if (error.message.includes("No verified high-quality")) {
-                emptyState.innerHTML = `<p style="color: var(--danger); font-size: 1.1rem; font-weight: 500;">❌ ${escapeHTML(error.message)}</p>`;
+                emptyState.innerHTML = `<p style="color: var(--danger); font-size: 1.1rem; font-weight: 500;">âŒ ${escapeHTML(error.message)}</p>`;
             } else {
                 showToast(error.message);
             }
@@ -863,7 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const savedList = getSavedPlaylists();
         const isSaved = savedList.some(p => p.url === data.url);
-        const saveBtnLabel = isSaved ? '✅ Saved' : '💾 Save';
+        const saveBtnLabel = isSaved ? 'âœ… Saved' : 'ðŸ’¾ Save';
         const saveBtnClass = isSaved ? 'btn-save-playlist saved' : 'btn-save-playlist';
 
         const isCert = !data.url.includes('youtube.com');
@@ -890,8 +932,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <h3 class="card-title">${escapeHTML(data.title)}</h3>
             <span class="channel-name">${escapeHTML(data.channel)}</span>
-            <p class="card-desc" style="margin-top: 10px;"><strong>💡 Why:</strong> ${escapeHTML(data.why_selected)}</p>
-            <p class="card-desc"><strong>⏱️ Time:</strong> ${escapeHTML(data.estimated_time)} | <strong>🎯 Outcome:</strong> ${escapeHTML(data.expected_outcome)}</p>
+            <p class="card-desc" style="margin-top: 10px;"><strong>ðŸ’¡ Why:</strong> ${escapeHTML(data.why_selected)}</p>
+            <p class="card-desc"><strong>â±ï¸ Time:</strong> ${escapeHTML(data.estimated_time)} | <strong>ðŸŽ¯ Outcome:</strong> ${escapeHTML(data.expected_outcome)}</p>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: auto;">
                 ${actionButtonsHtml}
             </div>
@@ -986,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     trackingBtnContainer.innerHTML = `
                         <div style="display:flex; gap:12px; align-items:center;">
                             <button id="btn-track-this-roadmap" class="btn-outline-primary" style="flex:1; background:rgba(37,99,235,0.05); color:var(--primary); border-color:var(--primary); font-weight:700; pointer-events:none; cursor:default; height:44px; display:flex; align-items:center; justify-content:center; gap:8px; border-radius:var(--radius-md);">
-                                <span>✓ Currently Tracking Progress</span>
+                                <span>âœ“ Currently Tracking Progress</span>
                             </button>
                             <button id="btn-learning-untrack" class="btn-outline-danger" style="color:var(--danger); border-color:var(--danger); height:44px; padding:0 16px; border-radius:var(--radius-md); font-weight:600; cursor:pointer; background:transparent; display:flex; align-items:center; justify-content:center; transition: all 0.2s;">
                                 Stop Tracking
@@ -996,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     trackingBtnContainer.innerHTML = `
                         <button id="btn-track-this-roadmap" class="btn-primary" style="width:100%; height:44px; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.9rem; border-radius:var(--radius-md);">
-                            🗺️ Track this Learning Roadmap
+                            ðŸ—ºï¸ Track this Learning Roadmap
                         </button>
                     `;
                 }
@@ -1020,12 +1062,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 roadmapContent.appendChild(checklistContainer);
 
                 const phases = [
-                    { key: 'beginner', label: '🌱 Beginner Phase' },
-                    { key: 'intermediate', label: '🔥 Intermediate Phase' },
-                    { key: 'advanced', label: '🚀 Advanced Phase' },
-                    { key: 'projects', label: '🛠️ Projects to Build' },
-                    { key: 'certifications', label: '🏆 Recommended Certifications' },
-                    { key: 'interview_prep', label: '💼 Interview Prep Focus' }
+                    { key: 'beginner', label: 'ðŸŒ± Beginner Phase' },
+                    { key: 'intermediate', label: 'ðŸ”¥ Intermediate Phase' },
+                    { key: 'advanced', label: 'ðŸš€ Advanced Phase' },
+                    { key: 'projects', label: 'ðŸ› ï¸ Projects to Build' },
+                    { key: 'certifications', label: 'ðŸ† Recommended Certifications' },
+                    { key: 'interview_prep', label: 'ðŸ’¼ Interview Prep Focus' }
                 ];
 
                 phases.forEach(phase => {
@@ -1123,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const savedList = getSavedPlaylists();
         const isSaved = savedList.some(p => p.url === url);
-        const saveBtnLabel = isSaved ? '✅ Saved' : '💾 Save';
+        const saveBtnLabel = isSaved ? 'âœ… Saved' : 'ðŸ’¾ Save';
         const saveBtnClass = isSaved ? 'btn-save-playlist saved' : 'btn-save-playlist';
 
         const actionButtonsHtml = isCert ? `
@@ -1264,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fetchCompanies = async () => {
         try {
-            const res = await fetch('/get-companies');
+            const res = await authFetch('/get-companies');
             allCompanies = await res.json();
         } catch (err) {
             showToast('Failed to load companies.');
@@ -1358,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         data-diff="${difficulty}"
                         data-topic="${topic}"
                         ${isSolved ? 'checked' : ''}>
-                    <span class="solve-label">${isSolved ? '✅ Solved' : 'Mark as Solved'}</span>
+                    <span class="solve-label">${isSolved ? 'âœ… Solved' : 'Mark as Solved'}</span>
                 </div>
 
                 <h3 class="card-title">${escapeHTML(name)}</h3>
@@ -1381,14 +1423,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>` : ''}
 
                 <a href="${link}" target="_blank" class="btn-watch" rel="noopener noreferrer" style="margin-top:16px;">
-                    Solve on LeetCode →
+                    Solve on LeetCode â†’
                 </a>
             `;
 
             const checkbox = card.querySelector('.solve-checkbox');
             checkbox.addEventListener('change', (e) => {
                 toggleSolved({ link, name, difficulty, topic }, e.target.checked);
-                card.querySelector('.solve-label').textContent = e.target.checked ? '✅ Solved' : 'Mark as Solved';
+                card.querySelector('.solve-label').textContent = e.target.checked ? 'âœ… Solved' : 'Mark as Solved';
                 updateCommandCenter();
             });
 
@@ -1525,7 +1567,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const offset = 314.16 - (314.16 * overallPct / 100);
         progressRingBar.style.strokeDashoffset = offset;
 
-        // Progress Bars Fill — DSA uses real data
+        // Progress Bars Fill â€” DSA uses real data
         const dsaLabelText = document.getElementById('dsa-progress-label-text');
         if (dsaLabelText) {
             dsaLabelText.textContent = `DSA (${totalSolved} solved)`;
@@ -1533,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('dsa-progress-label-pct').textContent = `${dsaPct}%`;
         document.getElementById('dsa-progress-bar-fill').style.width = `${dsaPct}%`;
         
-        // System Design — based on saved playlists with "system design" in title
+        // System Design â€” based on saved playlists with "system design" in title
         const sdPlaylists = savedPl.filter(p => (p.title + ' ' + (p.skill || '')).toLowerCase().includes('system'));
         const sdTotal = sdPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const sdDone = sdPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1541,7 +1583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('sd-progress-label-pct').textContent = `${sdPct}%`;
         document.getElementById('sd-progress-bar-fill').style.width = `${sdPct}%`;
         
-        // AI/ML — based on saved playlists with "ai" or "ml" or "machine" in title
+        // AI/ML â€” based on saved playlists with "ai" or "ml" or "machine" in title
         const aiPlaylists = savedPl.filter(p => /(ai|ml|machine|deep|neural)/i.test(p.title + ' ' + (p.skill || '')));
         const aiTotal = aiPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const aiDone = aiPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1549,7 +1591,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('aiml-progress-label-pct').textContent = `${aiPct}%`;
         document.getElementById('aiml-progress-bar-fill').style.width = `${aiPct}%`;
         
-        // Dev — remaining playlists (not SD/AI categorized)
+        // Dev â€” remaining playlists (not SD/AI categorized)
         const devPlaylists = savedPl.filter(p => !sdPlaylists.includes(p) && !aiPlaylists.includes(p));
         const devTotal = devPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const devDone = devPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1560,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Update Resume Score Card
         loadResumeScore();
 
-        // 5. Update Practice Overview KPIs — real data
+        // 5. Update Practice Overview KPIs â€” real data
         document.getElementById('overview-solved-count').textContent = totalSolved;
         document.getElementById('overview-success-rate').textContent = totalSolved > 0 ? `${Math.round((counts.Easy * 100 + counts.Medium * 70 + counts.Hard * 50) / Math.max(1, totalSolved))}%` : '0%';
         document.getElementById('overview-streak').textContent = streak;
@@ -1579,7 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadResumeScore = async () => {
         try {
-            const res = await fetch('/get-latest-resume');
+            const res = await authFetch('/get-latest-resume');
             if (res.ok) {
                 const dbData = await res.json();
                 if (dbData) {
@@ -1607,14 +1649,14 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('dashboard-resume-skills').textContent = data.match;
             document.getElementById('dashboard-resume-ats').textContent = typeof data.ats === 'number' ? `${data.ats}%` : data.ats;
         } else {
-            // No resume uploaded yet — show empty state
-            document.getElementById('dashboard-resume-score').textContent = '—/100';
+            // No resume uploaded yet â€” show empty state
+            document.getElementById('dashboard-resume-score').textContent = 'â€”/100';
             const verdictEl = document.getElementById('dashboard-resume-verdict');
             verdictEl.textContent = 'Not analyzed yet';
             verdictEl.className = 'score-verdict';
-            document.getElementById('dashboard-resume-impact').textContent = '—';
-            document.getElementById('dashboard-resume-skills').textContent = '—';
-            document.getElementById('dashboard-resume-ats').textContent = '—';
+            document.getElementById('dashboard-resume-impact').textContent = 'â€”';
+            document.getElementById('dashboard-resume-skills').textContent = 'â€”';
+            document.getElementById('dashboard-resume-ats').textContent = 'â€”';
         }
     };
 
@@ -1827,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fetch custom projects count
         let customProjectsCount = 0;
         try {
-            const projectsRes = await fetch('/get-user-projects');
+            const projectsRes = await authFetch('/get-user-projects');
             if (projectsRes.ok) {
                 const plist = await projectsRes.json();
                 if (Array.isArray(plist)) customProjectsCount = plist.length;
@@ -1847,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // Check if we can load it from backend
             try {
-                const res = await fetch('/get-latest-resume');
+                const res = await authFetch('/get-latest-resume');
                 if (res.ok) {
                     const dbData = await res.json();
                     if (dbData) {
@@ -1860,7 +1902,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Failed to fetch resume for analytics:", e);
             }
         }
-        if (atsScoreEl) atsScoreEl.textContent = latestResumeAnalysis ? `${resumeScore}%` : '—';
+        if (atsScoreEl) atsScoreEl.textContent = latestResumeAnalysis ? `${resumeScore}%` : 'â€”';
         if (atsVerdictEl) {
             atsVerdictEl.textContent = resumeVerdictText;
             atsVerdictEl.style.color = latestResumeAnalysis ? 'var(--primary)' : 'var(--text-muted)';
@@ -2187,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('audit-market-level').textContent = data.market_ready_level || 'Junior (L3)';
         document.getElementById('audit-verdict-text').textContent = `"${data.readiness_verdict}"`;
-        document.getElementById('audit-weeks').textContent = data.estimated_weeks_to_target || '—';
+        document.getElementById('audit-weeks').textContent = data.estimated_weeks_to_target || 'â€”';
         
         // Render technical gaps
         const gapsList = document.getElementById('audit-gaps-list');
@@ -2285,7 +2327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 1800);
 
-            const res = await fetch('/analyze-resume', {
+            const res = await authFetch('/analyze-resume', {
                 method: 'POST',
                 body: formData
             });
@@ -2472,7 +2514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tabCertificates.addEventListener('click', () => renderStep('certificates'));
     tabRoadmap.addEventListener('click', () => renderStep('roadmap'));
 
-    // ── Student Projects Management ──
+    // â”€â”€ Student Projects Management â”€â”€
     const projectsListContainer = document.getElementById('projects-list-container');
     const addProjectForm = document.getElementById('add-project-form');
 
@@ -2485,7 +2527,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const loadProjects = async () => {
         try {
-            const res = await fetch('/get-user-projects');
+            const res = await authFetch('/get-user-projects');
             if (res.ok) {
                 const list = await res.json();
                 if (Array.isArray(list)) {
@@ -2568,11 +2610,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             await syncProjects();
             renderProjectsList();
-            showToast('✅ Project added successfully!');
+            showToast('âœ… Project added successfully!');
         });
     }
 
-    // ── Jobs Board Logic ──────────────────────────────────────────
+    // â”€â”€ Jobs Board Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let currentJobsList = [];
     let savedJobIds = JSON.parse(localStorage.getItem('hm_saved_jobs') || '[]');
 
@@ -2681,7 +2723,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                const logo = job.employer_logo ? `<img src="${job.employer_logo}" alt="${job.employer_name}" style="width:100%; height:100%; object-fit:contain; border-radius:6px;" onerror="this.outerHTML='💼'"/>` : "💼";
+                const logo = job.employer_logo ? `<img src="${job.employer_logo}" alt="${job.employer_name}" style="width:100%; height:100%; object-fit:contain; border-radius:6px;" onerror="this.outerHTML='ðŸ’¼'"/>` : "ðŸ’¼";
 
                 return {
                     id: job.job_id || `job_${idx}`,
@@ -2772,7 +2814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <h3 class="job-title">${job.title}</h3>
                             </div>
                         </div>
-                        <span class="${badgeClass}">🎯 ${job.matchScore}% Match</span>
+                        <span class="${badgeClass}">ðŸŽ¯ ${job.matchScore}% Match</span>
                     </div>
                     <p class="job-desc">${job.description}</p>
                     <div class="job-tags">
@@ -2781,12 +2823,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="job-meta">
                     <div class="job-details-group">
-                        <span class="job-location">📍 ${job.location}</span>
+                        <span class="job-location">ðŸ“ ${job.location}</span>
                         <span class="job-salary">${job.salary}</span>
                     </div>
                     <div class="job-actions">
                         <button class="btn-job-save ${isSaved ? 'saved' : ''}" onclick="window.toggleSaveJob('${job.id}', this)" title="${isSaved ? 'Unsave Job' : 'Save Job'}">
-                            ❤️
+                            â¤ï¸
                         </button>
                         <button class="btn-job-apply" onclick="window.applyToJob('${job.applyLink ? job.applyLink.replace(/'/g, "\\'") : '#'}')">
                             Apply
@@ -2803,11 +2845,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (index > -1) {
             savedJobIds.splice(index, 1);
             btn.classList.remove('saved');
-            showToast('💔 Job removed from saved list');
+            showToast('ðŸ’” Job removed from saved list');
         } else {
             savedJobIds.push(jobId);
             btn.classList.add('saved');
-            showToast('❤️ Job saved to profile');
+            showToast('â¤ï¸ Job saved to profile');
         }
         localStorage.setItem('hm_saved_jobs', JSON.stringify(savedJobIds));
         document.getElementById('saved-jobs-count').textContent = savedJobIds.length;
@@ -2817,11 +2859,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (url && url.startsWith('http')) {
             window.open(url, '_blank');
         } else {
-            showToast('🚀 Applying to job...');
+            showToast('ðŸš€ Applying to job...');
         }
     };
 
-    // ── Sidebar Router Logic ──────────────────────────────────────
+    // â”€â”€ Sidebar Router Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const navItems = document.querySelectorAll('.sidebar .nav-item');
     const views = document.querySelectorAll('.content-view');
 
@@ -2915,7 +2957,7 @@ document.addEventListener('DOMContentLoaded', () => {
         triggerRecommendationSearch('System Design');
     });
 
-    // ── Dedicated AI Mentor page consultation ────────────────────
+    // â”€â”€ Dedicated AI Mentor page consultation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const mentorSubmitPage = document.getElementById('mentor-submit-btn-page');
     const mentorResultPage = document.getElementById('mentor-result-page');
 
@@ -2934,10 +2976,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             mentorSubmitPage.textContent = 'Consulting your mentor...';
             mentorSubmitPage.disabled = true;
-            mentorResultPage.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div><p style="color:var(--text-sub);">⚡ Analyzing your path...</p></div>';
+            mentorResultPage.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div><p style="color:var(--text-sub);">âš¡ Analyzing your path...</p></div>';
 
             try {
-                const res = await fetch('/mentor-mode', {
+                const res = await authFetch('/mentor-mode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -2958,43 +3000,43 @@ document.addEventListener('DOMContentLoaded', () => {
                             "${escapeHTML(data.verdict)}"
                         </p>
                         ${ data.lagging_areas && data.lagging_areas.length ? `
-                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">⚠️ Where you are lagging behind:</p>
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">âš ï¸ Where you are lagging behind:</p>
                         <ul style="padding-left:16px; color:var(--danger); font-size:0.85rem; margin-bottom:12px;">
                             ${data.lagging_areas.map(area => `<li>${escapeHTML(area)}</li>`).join('')}
                         </ul>` : ''}
                         ${ data.wasted_time && data.wasted_time.length ? `
-                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:4px; font-weight:600;">⛔ Stop wasting time on:</p>
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:4px; font-weight:600;">â›” Stop wasting time on:</p>
                         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
                             ${data.wasted_time.map(s => `<span class="pill-badge" style="background:#fee2e2;color:#ef4444;border-color:transparent;">${escapeHTML(s)}</span>`).join('')}
                         </div>` : ''}
                         ${ data.must_learn_now && data.must_learn_now.length ? `
-                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">✅ Learn these NOW:</p>
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">âœ… Learn these NOW:</p>
                         <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px;">
-                            ${data.must_learn_now.map(i => `<li><strong>${escapeHTML(i.skill)}</strong> — ${escapeHTML(i.reason)}</li>`).join('')}
+                            ${data.must_learn_now.map(i => `<li><strong>${escapeHTML(i.skill)}</strong> â€” ${escapeHTML(i.reason)}</li>`).join('')}
                         </ul>` : ''}
                         ${ data.improvement_suggestions && data.improvement_suggestions.length ? `
-                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">💡 How to do it better:</p>
+                        <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">ðŸ’¡ How to do it better:</p>
                         <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px; line-height:1.5;">
-                            ${data.improvement_suggestions.map(s => `<li><strong>${escapeHTML(s.action)}</strong> — ${escapeHTML(s.how_to_do_better)}</li>`).join('')}
+                            ${data.improvement_suggestions.map(s => `<li><strong>${escapeHTML(s.action)}</strong> â€” ${escapeHTML(s.how_to_do_better)}</li>`).join('')}
                         </ul>` : ''}
                         <p style="color:var(--text-sub); font-size:0.85rem; line-height:1.6; margin-bottom:12px;">
                             ${escapeHTML(data.brutal_truth)}
                         </p>
                         <div style="background:var(--primary-light); border-left:3px solid var(--primary); padding:12px 16px; border-radius:8px;">
-                            <p style="color:var(--primary); font-size:0.85rem; margin:0; font-weight:600;">🎯 This week: ${escapeHTML(data.action_this_week)}</p>
+                            <p style="color:var(--primary); font-size:0.85rem; margin:0; font-weight:600;">ðŸŽ¯ This week: ${escapeHTML(data.action_this_week)}</p>
                         </div>
                     </div>
                 `;
             } catch(e) {
                 mentorResultPage.innerHTML = `<p style="color:var(--danger);">Failed: ${escapeHTML(e.message)}</p>`;
             } finally {
-                mentorSubmitPage.textContent = 'Get Brutal Advice ⚡';
+                mentorSubmitPage.textContent = 'Get Brutal Advice âš¡';
                 mentorSubmitPage.disabled = false;
             }
         });
     }
 
-    // ── MOCK INTERVIEW SIMULATOR LOGIC ──────────────────────────────
+    // â”€â”€ MOCK INTERVIEW SIMULATOR LOGIC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let interviewChatHistory = [];
     let currentInterviewMeta = {};
     let isWaitingForAI = false;
@@ -3034,7 +3076,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initInterviewInputs = async () => {
         try {
-            const res = await fetch('/get-user-session');
+            const res = await authFetch('/get-user-session');
             if (res.ok) {
                 const data = await res.json();
                 if (data.logged_in) {
@@ -3052,7 +3094,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadInterviewHistory = async () => {
         if (!historyList) return;
         try {
-            const res = await fetch('/get-interview-history');
+            const res = await authFetch('/get-interview-history');
             if (!res.ok) throw new Error("Failed history fetch");
             const data = await res.json();
             
@@ -3071,7 +3113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.className = 'interview-history-item';
                 card.innerHTML = `
                     <div class="interview-history-info">
-                        <div class="interview-history-title">${escapeHTML(item.interview_round_type)} — ${escapeHTML(item.target_company)} Tier</div>
+                        <div class="interview-history-title">${escapeHTML(item.interview_round_type)} â€” ${escapeHTML(item.target_company)} Tier</div>
                         <div class="interview-history-meta">Completed: ${dateStr}</div>
                     </div>
                     <div class="interview-history-actions">
@@ -3308,7 +3350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2200);
 
         try {
-            const res = await fetch('/evaluate-mock-interview', {
+            const res = await authFetch('/evaluate-mock-interview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3464,7 +3506,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Try DB first via backend API endpoint
         try {
-            const res = await fetch('/api/profile');
+            const res = await authFetch('/api/profile');
             if (res.ok) {
                 const profile = await res.json();
                 if (profile) {
@@ -3541,7 +3583,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (leetcode) {
             if (summaryLeetCode) {
-                summaryLeetCode.textContent = "Loading stats... 🔄";
+                summaryLeetCode.textContent = "Loading stats... ðŸ”„";
                 summaryLeetCode.style.color = "var(--text-muted)";
             }
             try {
@@ -3557,38 +3599,38 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data && data.status === 'success' && data.stats) {
                         const solved = data.stats.All || 0;
                         if (summaryLeetCode) {
-                            summaryLeetCode.textContent = `${solved} Solved ✅`;
+                            summaryLeetCode.textContent = `${solved} Solved âœ…`;
                             summaryLeetCode.style.color = "var(--primary)";
                         }
                     } else {
                         if (summaryLeetCode) {
-                            summaryLeetCode.textContent = `Synced (${cleanLC}) ⚠️`;
+                            summaryLeetCode.textContent = `Synced (${cleanLC}) âš ï¸`;
                             summaryLeetCode.style.color = "var(--text-main)";
                         }
                     }
                 } else {
                     if (summaryLeetCode) {
-                        summaryLeetCode.textContent = `Synced (${cleanLC}) ⚠️`;
+                        summaryLeetCode.textContent = `Synced (${cleanLC}) âš ï¸`;
                         summaryLeetCode.style.color = "var(--text-main)";
                     }
                 }
             } catch (e) {
                 console.error("Failed to fetch LC stats on settings open:", e);
                 if (summaryLeetCode) {
-                    summaryLeetCode.textContent = `Synced (${leetcode}) ⚠️`;
+                    summaryLeetCode.textContent = `Synced (${leetcode}) âš ï¸`;
                     summaryLeetCode.style.color = "var(--text-main)";
                 }
             }
         } else {
             if (summaryLeetCode) {
-                summaryLeetCode.textContent = "Not configured 🛑";
+                summaryLeetCode.textContent = "Not configured ðŸ›‘";
                 summaryLeetCode.style.color = "var(--danger)";
             }
         }
 
         if (github) {
             if (summaryGitHub) {
-                summaryGitHub.textContent = "Loading repos... 🔄";
+                summaryGitHub.textContent = "Loading repos... ðŸ”„";
                 summaryGitHub.style.color = "var(--text-muted)";
             }
             try {
@@ -3601,25 +3643,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = await res.json();
                     const repos = data.public_repos !== undefined ? data.public_repos : 0;
                     if (summaryGitHub) {
-                        summaryGitHub.textContent = `${repos} Repos ✅`;
+                        summaryGitHub.textContent = `${repos} Repos âœ…`;
                         summaryGitHub.style.color = "var(--primary)";
                     }
                 } else {
                     if (summaryGitHub) {
-                        summaryGitHub.textContent = `Synced (${cleanGH}) ⚠️`;
+                        summaryGitHub.textContent = `Synced (${cleanGH}) âš ï¸`;
                         summaryGitHub.style.color = "var(--text-main)";
                     }
                 }
             } catch (e) {
                 console.error("Failed to fetch GitHub repos on settings open:", e);
                 if (summaryGitHub) {
-                    summaryGitHub.textContent = `Synced (${github}) ⚠️`;
+                    summaryGitHub.textContent = `Synced (${github}) âš ï¸`;
                     summaryGitHub.style.color = "var(--text-main)";
                 }
             }
         } else {
             if (summaryGitHub) {
-                summaryGitHub.textContent = "Not configured 🛑";
+                summaryGitHub.textContent = "Not configured ðŸ›‘";
                 summaryGitHub.style.color = "var(--danger)";
             }
         }
@@ -3667,7 +3709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save to DB via backend endpoint (robust, bypasses client-side RLS issues)
         let dbSaved = false;
         try {
-            const res = await fetch('/save-coding-profiles', {
+            const res = await authFetch('/save-coding-profiles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3698,9 +3740,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (dbSaved) {
-            showToast('✅ Profile saved successfully to Cloud & local storage!');
+            showToast('âœ… Profile saved successfully to Cloud & local storage!');
         } else {
-            showToast('✅ Profile saved locally (Cloud sync failed or pending schema migration).');
+            showToast('âœ… Profile saved locally (Cloud sync failed or pending schema migration).');
         }
 
         if (leetcode) {
@@ -3727,7 +3769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let email = 'learner@example.com';
         
         try {
-            const res = await fetch('/get-user-session');
+            const res = await authFetch('/get-user-session');
             if (res.ok) {
                 const data = await res.json();
                 if (data.logged_in) {
@@ -3748,7 +3790,7 @@ document.addEventListener('DOMContentLoaded', () => {
         name = name.charAt(0).toUpperCase() + name.slice(1);
         const initials = name.substring(0, 2).toUpperCase();
 
-        document.getElementById('welcome-title-banner').textContent = `Welcome back, ${name}! 👋`;
+        document.getElementById('welcome-title-banner').textContent = `Welcome back, ${name}! ðŸ‘‹`;
         document.getElementById('user-avatar-initials').textContent = initials;
 
         const profileName = document.getElementById('profile-user-name');
@@ -3762,7 +3804,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initDsaProgress = async () => {
         try {
-            const res = await fetch('/get-dsa-progress');
+            const res = await authFetch('/get-dsa-progress');
             if (res.ok) {
                 const list = await res.json();
                 if (Array.isArray(list)) {
@@ -3849,7 +3891,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!leetcode && !github && !codeforces && !codementor) {
                 codingResultPage.innerHTML = `
                     <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:12px; color:#ef4444; font-size:0.85rem; font-weight:600; margin-top:16px;">
-                        ⚠️ Please configure at least one coding profile (LeetCode, GitHub, Codeforces, or Codementor) in Settings to execute the analysis.
+                        âš ï¸ Please configure at least one coding profile (LeetCode, GitHub, Codeforces, or Codementor) in Settings to execute the analysis.
                     </div>
                 `;
                 return;
@@ -3857,10 +3899,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             codingSubmitBtnPage.textContent = 'Auditing coding standing...';
             codingSubmitBtnPage.disabled = true;
-            codingResultPage.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div><p style="color:var(--text-sub);">⚡ Analyzing coding standings & DSA progress...</p></div>';
+            codingResultPage.innerHTML = '<div style="text-align:center; padding:20px;"><div class="spinner"></div><p style="color:var(--text-sub);">âš¡ Analyzing coding standings & DSA progress...</p></div>';
 
             try {
-                const res = await fetch('/mentor-mode', {
+                const res = await authFetch('/mentor-mode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -3891,7 +3933,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- Header Banner -->
                         <div style="background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 16px; padding: 28px; color: white; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);">
                             <h2 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-                                🔥 Coding Growth Report
+                                ðŸ”¥ Coding Growth Report
                             </h2>
                             <p style="margin: 0; font-size: 0.95rem; opacity: 0.9; font-weight: 500;">
                                 Premium Technical Alignment & Placement Readiness Audit
@@ -3901,7 +3943,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 1. Performance Snapshot -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                📊 1. Performance Snapshot
+                                ðŸ“Š 1. Performance Snapshot
                             </h3>
                             <p style="font-size: 0.925rem; line-height: 1.6; color: var(--text-sub); margin: 0; padding: 14px; background: rgba(99, 102, 241, 0.04); border-left: 4px solid #6366f1; border-radius: 0 8px 8px 0; font-style: italic;">
                                 "${escapeHTML(snapshot.summary)}"
@@ -3913,15 +3955,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Difficulty Breakdown</span>
-                                    <strong style="font-size: 1rem; color: var(--text-main);">${escapeHTML(snapshot.difficulty_distribution || '—')}</strong>
+                                    <strong style="font-size: 1rem; color: var(--text-main);">${escapeHTML(snapshot.difficulty_distribution || 'â€”')}</strong>
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Strongest Platform</span>
-                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.strongest_platform || '—')}</strong>
+                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.strongest_platform || 'â€”')}</strong>
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Contests & Streak</span>
-                                    <strong style="font-size: 0.95rem; color: var(--text-main);">${escapeHTML(snapshot.contest_participation || '—')} (${escapeHTML(snapshot.current_streak || '0')})</strong>
+                                    <strong style="font-size: 0.95rem; color: var(--text-main);">${escapeHTML(snapshot.contest_participation || 'â€”')} (${escapeHTML(snapshot.current_streak || '0')})</strong>
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
@@ -3941,13 +3983,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 2. Strength Analysis -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                🌟 2. Strength Analysis
+                                ðŸŒŸ 2. Strength Analysis
                             </h3>
                             <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
                                 ${strengths.map(s => `
                                     <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px;">
                                         <strong style="color: var(--success); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
-                                            <span>✔</span> ${escapeHTML(s.title)}
+                                            <span>âœ”</span> ${escapeHTML(s.title)}
                                         </strong>
                                         <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub); line-height: 1.5;">${escapeHTML(s.why)}</p>
                                     </div>
@@ -3958,23 +4000,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 3. Skill Gap Analysis -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                🎯 3. High-Impact Areas for Growth
+                                ðŸŽ¯ 3. High-Impact Areas for Growth
                             </h3>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
                                 <div style="background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
-                                    <strong style="color: #ef4444; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🔴 Critical</strong>
+                                    <strong style="color: #ef4444; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">ðŸ”´ Critical</strong>
                                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                         ${(growthAreas.critical || []).map(topic => `<span class="pill-badge" style="background:#fef2f2; color:#ef4444; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
                                     </div>
                                 </div>
                                 <div style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
-                                    <strong style="color: #f59e0b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🟡 Important</strong>
+                                    <strong style="color: #f59e0b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">ðŸŸ¡ Important</strong>
                                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                         ${(growthAreas.important || []).map(topic => `<span class="pill-badge" style="background:#fffbeb; color:#d97706; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
                                     </div>
                                 </div>
                                 <div style="background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.1); padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 10px;">
-                                    <strong style="color: #3b82f6; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">🔵 Optional</strong>
+                                    <strong style="color: #3b82f6; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">ðŸ”µ Optional</strong>
                                     <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                         ${(growthAreas.optional || []).map(topic => `<span class="pill-badge" style="background:#eff6ff; color:#2563eb; border-color:transparent; font-size:0.75rem;">${escapeHTML(topic)}</span>`).join('')}
                                     </div>
@@ -3985,7 +4027,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 4. Interview Readiness Assessment -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                💼 4. Interview Readiness Assessment
+                                ðŸ’¼ 4. Interview Readiness Assessment
                             </h3>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex-wrap: wrap;">
                                 <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -4016,7 +4058,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 5. Personalized Roadmap -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                🗓 5. 30-Day Personalized Action Plan
+                                ðŸ—“ 5. 30-Day Personalized Action Plan
                             </h3>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
                                 ${["week_1", "week_2", "week_3", "week_4"].map((wk, idx) => `
@@ -4034,7 +4076,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex-wrap: wrap;">
                             <div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
                                 <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                    💡 6. AI Insights
+                                    ðŸ’¡ 6. AI Insights
                                 </h4>
                                 <ul style="padding-left: 18px; margin: 0; font-size: 0.85rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 8px; line-height: 1.5;">
                                     ${insights.map(item => `<li>${escapeHTML(item)}</li>`).join('')}
@@ -4042,7 +4084,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.02), rgba(168, 85, 247, 0.02)); justify-content: center; border: 1px dashed rgba(99,102,241,0.25);">
                                 <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                    ✨ 7. Growth Motivation
+                                    âœ¨ 7. Growth Motivation
                                 </h4>
                                 <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub); line-height: 1.6; font-style: italic;">
                                     "${escapeHTML(motivation)}"
@@ -4053,16 +4095,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         <!-- 8. Visual Dashboard Suggestions -->
                         <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                🎴 8. Visual Dashboard Cards Recommendations
+                                ðŸŽ´ 8. Visual Dashboard Cards Recommendations
                             </h3>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
                                 ${[
-                                    { title: "Achievement Card", text: dbCards.achievement_card || "🏆 Setup achievements details" },
-                                    { title: "Growth Score Card", text: dbCards.growth_score_card || "📈 Track scores weekly" },
-                                    { title: "Interview Readiness Card", text: dbCards.interview_readiness_card || "🎯 Monitor placement status" },
-                                    { title: "Next Milestone Card", text: dbCards.next_milestone_card || "⚡ Reach next level goals" },
-                                    { title: "30-Day Roadmap Card", text: dbCards.roadmap_card || "🗓 Review action planning daily" },
-                                    { title: "Streak Card", text: dbCards.streak_card || "🔥 Keep coding consistency" }
+                                    { title: "Achievement Card", text: dbCards.achievement_card || "ðŸ† Setup achievements details" },
+                                    { title: "Growth Score Card", text: dbCards.growth_score_card || "ðŸ“ˆ Track scores weekly" },
+                                    { title: "Interview Readiness Card", text: dbCards.interview_readiness_card || "ðŸŽ¯ Monitor placement status" },
+                                    { title: "Next Milestone Card", text: dbCards.next_milestone_card || "âš¡ Reach next level goals" },
+                                    { title: "30-Day Roadmap Card", text: dbCards.roadmap_card || "ðŸ—“ Review action planning daily" },
+                                    { title: "Streak Card", text: dbCards.streak_card || "ðŸ”¥ Keep coding consistency" }
                                 ].map(card => `
                                     <div style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 4px;">
                                         <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">${escapeHTML(card.title)}</span>
@@ -4077,7 +4119,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(e) {
                 codingResultPage.innerHTML = `<p style="color:var(--danger); margin-top:16px;">Failed: ${escapeHTML(e.message)}</p>`;
             } finally {
-                codingSubmitBtnPage.textContent = 'Analyze Coding Profiles & DSA ⚡';
+                codingSubmitBtnPage.textContent = 'Analyze Coding Profiles & DSA âš¡';
                 codingSubmitBtnPage.disabled = false;
             }
         });
