@@ -756,44 +756,118 @@
                     </div>
                 </div>
 
-                <!-- STAGE 2: ACTIVE INTERVIEW CHAT -->
+                <!-- STAGE 2: ACTIVE VOICE INTERVIEW CONVERSATION -->
                 <div id="interview-stage-chat" class="interview-stage" style="display: none;">
-                    <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 24px;">
-                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; height: 620px;">
-                            <!-- Header Info -->
-                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 16px;">
+                    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; margin-bottom: 24px;">
+                        
+                        <!-- Main Recruiter Alex Call Dashboard -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; height: 600px; justify-content: space-between; position: relative;">
+                            
+                            <!-- Call Header -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
                                 <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div style="width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">🤖</div>
-                                    <div style="display: flex; flex-direction: column;">
-                                        <strong id="interviewer-name-label" style="color: var(--text-main); font-size: 1rem;">Interviewer</strong>
-                                        <span id="interview-meta-label" style="color: var(--text-muted); font-size: 0.75rem;">Coding & DSA | Google Benchmark</span>
-                                    </div>
+                                    <div style="width: 10px; height: 10px; background: #10b981; border-radius: 50%; animation: pulse 1.5s infinite;"></div>
+                                    <strong style="color: var(--text-main); font-size: 1rem; font-family: 'Outfit', sans-serif;">Live Mock Interview Session</strong>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <span id="interview-progress-pill" class="pill-badge" style="background: var(--primary-light); color: var(--primary); font-weight: 700; font-size: 0.8rem; padding: 6px 12px;">Turn 1 of 3</span>
-                                    <button id="btn-quit-interview" style="background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s;">Quit</button>
+                                <span id="voice-interview-round-label" style="font-size: 0.8rem; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 4px 10px; border-radius: 6px;">Welcome Round</span>
+                            </div>
+
+                            <!-- Visual Recruiter Call Hub -->
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 20px 0;">
+                                
+                                <!-- Interviewer Circle Avatar & Speak Indicators -->
+                                <div id="interviewer-avatar-container" style="width: 130px; height: 130px; border-radius: 50%; background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%); display: flex; align-items: center; justify-content: center; font-size: 3.5rem; position: relative; box-shadow: 0 8px 30px rgba(79, 70, 229, 0.3); transition: all 0.3s;">
+                                    👨‍💼
+                                    <!-- Animated Wave Rings -->
+                                    <div class="pulse-ring" style="position: absolute; width: 100%; height: 100%; border: 3px solid var(--primary); border-radius: 50%; opacity: 0.4; animation: ripple 2s infinite;"></div>
+                                </div>
+
+                                <!-- AI Speech / Voice Transcription Visualizer Wave -->
+                                <div style="display: flex; align-items: center; gap: 4px; height: 40px;">
+                                    <div class="wave-bar" style="width: 4px; height: 8px; background: var(--primary); border-radius: 2px; animation: bounceWave 0.8s infinite 0.1s;"></div>
+                                    <div class="wave-bar" style="width: 4px; height: 24px; background: var(--primary); border-radius: 2px; animation: bounceWave 0.8s infinite 0.3s;"></div>
+                                    <div class="wave-bar" style="width: 4px; height: 35px; background: var(--primary); border-radius: 2px; animation: bounceWave 0.8s infinite 0.5s;"></div>
+                                    <div class="wave-bar" style="width: 4px; height: 18px; background: var(--primary); border-radius: 2px; animation: bounceWave 0.8s infinite 0.2s;"></div>
+                                    <div class="wave-bar" style="width: 4px; height: 8px; background: var(--primary); border-radius: 2px; animation: bounceWave 0.8s infinite 0.4s;"></div>
+                                </div>
+
+                                <!-- Dynamic Text Subtitles Overlay -->
+                                <div style="max-width: 480px; text-align: center; margin-top: 10px;">
+                                    <p id="voice-subtitles-box" style="font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 500; color: var(--text-main); line-height: 1.6; margin: 0; min-height: 50px;">
+                                        Initializing call setup... Alex will speak shortly.
+                                    </p>
                                 </div>
                             </div>
 
-                            <!-- Chat Stream -->
-                            <div id="interview-chat-stream" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 8px; margin-bottom: 20px;">
-                                <!-- Messages will be dynamically rendered here -->
-                            </div>
+                            <!-- Audio Player for synthesizing gTTS MP3 streams -->
+                            <audio id="voice-audio-element" style="display: none;" autoplay></audio>
 
-                            <!-- Response Editor & Form -->
-                            <div style="border-top: 1px solid var(--border); padding-top: 16px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <span id="response-guideline-label" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Provide your code or detailed explanation below:</span>
-                                    <span id="char-counter" style="font-size: 0.75rem; color: var(--text-muted);">0 characters</span>
-                                </div>
-                                <div style="display: flex; gap: 12px; align-items: flex-end;">
-                                    <textarea id="interview-response-input" class="skill-input" placeholder="Type your response here..." style="flex: 1; height: 110px; padding: 12px; font-family: 'Courier New', Courier, monospace; font-size: 0.9rem; resize: none; box-sizing: border-box; line-height: 1.5;"></textarea>
-                                    <button id="btn-submit-answer" class="cta-button" style="height: 110px; width: 140px; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                                        Submit Answer
+                            <!-- Microphone Controllers & Control Bar -->
+                            <div style="border-top: 1px solid var(--border); padding-top: 20px; display: flex; flex-direction: column; gap: 14px; align-items: center;">
+                                
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <!-- End call -->
+                                    <button id="btn-end-interview-call" class="btn-outline-primary" style="border-color: #ef4444; color: #ef4444; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;" onclick="window.finishInterviewSession()">
+                                        🛑
+                                    </button>
+                                    
+                                    <!-- Speak Microphone / Push To Talk -->
+                                    <button id="btn-voice-mic-toggle" style="background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%); color: white; border: none; border-radius: 50%; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; cursor: pointer; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3); transition: all 0.2s;" onclick="window.toggleSpeechListen()">
+                                        🎤
+                                    </button>
+
+                                    <!-- Toggle Text Input override fallback -->
+                                    <button id="btn-toggle-manual-text" class="btn-outline-primary" style="width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;" onclick="window.toggleTextInputOverride()">
+                                        ⌨️
                                     </button>
                                 </div>
+                                
+                                <div id="voice-state-desc-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                                    Recruiter Speaking...
+                                </div>
+                            </div>
+
+                            <!-- Manual Text Override Box container (collapsible) -->
+                            <div id="manual-text-override-container" style="display: none; position: absolute; bottom: 100px; left: 24px; right: 24px; background: var(--bg-main); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 10;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-sub);">Text Input Override</span>
+                                    <button style="background: transparent; border: none; font-size: 1.1rem; cursor: pointer; color: var(--text-muted);" onclick="window.toggleTextInputOverride()">×</button>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" id="manual-text-chat-input" placeholder="Type your response instead..." class="skill-input" style="flex: 1; padding: 10px;" />
+                                    <button class="cta-button" style="padding: 10px 16px;" onclick="window.submitManualTextResponse()">Send</button>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Right Panel: Camera Preview for posture/eye-contact tracking -->
+                        <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 14px; height: 600px; box-sizing: border-box;">
+                            <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 700; color: var(--text-main);">Camera & Pose Audit</h4>
+                            
+                            <!-- Video WebRTC Viewport -->
+                            <div id="pose-video-container" style="flex: 1; background: #000; border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center;">
+                                <video id="pose-local-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none;"></video>
+                                
+                                <div id="pose-camera-fallback" style="text-align: center; color: #64748b; padding: 20px;">
+                                    <span style="font-size: 2rem;">📷</span>
+                                    <p style="margin: 8px 0 0; font-size: 0.8rem; font-weight: 600;">Camera feeds disabled</p>
+                                    <button class="btn-outline-primary" style="padding: 6px 12px; font-size: 0.75rem; margin-top: 8px;" onclick="window.enableCameraPoseTracking()">Enable Webcam</button>
+                                </div>
+                                
+                                <!-- Floating metrics -->
+                                <div id="camera-active-tag" style="display: none; position: absolute; top: 12px; left: 12px; background: rgba(16,185,129,0.85); color: white; font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">
+                                    REC ACTIVE
+                                </div>
+                            </div>
+                            
+                            <!-- Body Language Live Feedback Box -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 0.8rem; color: var(--text-sub);">
+                                <strong style="color: var(--text-main); display: block; margin-bottom: 4px;">Posture Evaluation</strong>
+                                <span id="live-pose-assessment">Camera unavailable. Eye contact and smiles metrics are currently muted.</span>
                             </div>
                         </div>
+
                     </div>
                 </div>
 

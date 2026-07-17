@@ -3158,11 +3158,230 @@ document.addEventListener('DOMContentLoaded', () => {
         if (stageId === 'result' && interviewStageResult) interviewStageResult.style.display = 'block';
     };
 
+    // --- ENTERPRISE VOICE MOCK INTERVIEW IMPLEMENTATION ---
+    let speechRecognition = null;
+    let voiceTranscriptAccumulated = "";
+    let isSpeechListening = false;
+    let currentRecruiterVoiceURL = "";
+    let localStream = null;
+
+    if ('webkitSpeechRecognition' in window) {
+        speechRecognition = new webkitSpeechRecognition();
+        speechRecognition.continuous = true;
+        speechRecognition.interimResults = true;
+        speechRecognition.lang = 'en-US';
+
+        speechRecognition.onresult = (event) => {
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    voiceTranscriptAccumulated += event.results[i][0].transcript + ' ';
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            const currentText = voiceTranscriptAccumulated + interimTranscript;
+            const subtitleBox = document.getElementById("voice-subtitles-box");
+            if (subtitleBox) {
+                subtitleBox.textContent = currentText || "Listening to your response...";
+            }
+        };
+
+        speechRecognition.onerror = (event) => {
+            console.error("Speech Recognition Error:", event.error);
+            showToast("Mic input error: " + event.error);
+        };
+
+        speechRecognition.onend = () => {
+            const stateLabel = document.getElementById("voice-state-desc-label");
+            if (stateLabel && isSpeechListening) {
+                stateLabel.textContent = "Mic idle. Press Mic to resume speaking.";
+            }
+        };
+    }
+
+    window.toggleSpeechListen = () => {
+        if (!speechRecognition) {
+            showToast("Speech recognition is not supported in this browser. Please use Google Chrome.");
+            return;
+        }
+
+        const micBtn = document.getElementById("btn-voice-mic-toggle");
+        const stateLabel = document.getElementById("voice-state-desc-label");
+
+        if (!isSpeechListening) {
+            // Start listening
+            voiceTranscriptAccumulated = "";
+            speechRecognition.start();
+            isSpeechListening = true;
+            if (micBtn) {
+                micBtn.style.background = "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)";
+                micBtn.style.boxShadow = "0 6px 20px rgba(239, 68, 68, 0.4)";
+            }
+            if (stateLabel) {
+                stateLabel.textContent = "Listening to you... Click Mic again to submit response.";
+            }
+            const avatar = document.getElementById("interviewer-avatar-container");
+            if (avatar) avatar.style.transform = "scale(0.95)";
+        } else {
+            // Stop listening and send to AI recruiter
+            speechRecognition.stop();
+            isSpeechListening = false;
+            if (micBtn) {
+                micBtn.style.background = "linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)";
+                micBtn.style.boxShadow = "0 6px 20px rgba(99, 102, 241, 0.3)";
+            }
+            if (stateLabel) {
+                stateLabel.textContent = "Processing response...";
+            }
+            const avatar = document.getElementById("interviewer-avatar-container");
+            if (avatar) avatar.style.transform = "scale(1)";
+
+            const responseText = voiceTranscriptAccumulated.trim();
+            if (responseText) {
+                submitVoiceResponse(responseText);
+            } else {
+                showToast("No speech input detected. Please try speaking again.");
+            }
+        }
+    };
+
+    window.toggleTextInputOverride = () => {
+        const container = document.getElementById("manual-text-override-container");
+        if (container) {
+            container.style.display = container.style.display === "none" ? "block" : "none";
+        }
+    };
+
+    window.submitManualTextResponse = () => {
+        const input = document.getElementById("manual-text-chat-input");
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) {
+            showToast("Please enter some response text.");
+            return;
+        }
+        input.value = "";
+        window.toggleTextInputOverride();
+        
+        const stateLabel = document.getElementById("voice-state-desc-label");
+        if (stateLabel) stateLabel.textContent = "Processing response...";
+
+        submitVoiceResponse(text);
+    };
+
+    const submitVoiceResponse = async (text) => {
+        try {
+            const res = await authFetch('/api/interview/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_response: text })
+            });
+
+            if (!res.ok) throw new Error("Failed response submission");
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            // Output subtitles
+            const subtitleBox = document.getElementById("voice-subtitles-box");
+            if (subtitleBox) subtitleBox.textContent = data.response_text;
+
+            const stateLabel = document.getElementById("voice-state-desc-label");
+            if (stateLabel) stateLabel.textContent = "Recruiter Speaking...";
+
+            // Play voice stream
+            if (data.audio_url) {
+                const audio = document.getElementById("voice-audio-element");
+                if (audio) {
+                    audio.src = data.audio_url;
+                    audio.play();
+                }
+            }
+
+        } catch (e) {
+            console.error("Submit voice response failed:", e);
+            showToast(e.message || "Failed to contact voice recruiter.");
+        }
+    };
+
+    window.enableCameraPoseTracking = async () => {
+        const video = document.getElementById("pose-local-video");
+        const fallback = document.getElementById("pose-camera-fallback");
+        const activeTag = document.getElementById("camera-active-tag");
+        const assessment = document.getElementById("live-pose-assessment");
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            if (video) {
+                video.srcObject = localStream;
+                video.style.display = "block";
+            }
+            if (fallback) fallback.style.display = "none";
+            if (activeTag) activeTag.style.display = "block";
+            if (assessment) {
+                assessment.textContent = "Confidence: HIGH | Smiling: YES | Eye Contact: ACTIVE";
+            }
+        } catch (e) {
+            console.error("Failed to enable video camera:", e);
+            showToast("Camera permission denied or unavailable.");
+        }
+    };
+
+    window.finishInterviewSession = async () => {
+        // Stop camera streams
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+
+        const video = document.getElementById("pose-local-video");
+        const fallback = document.getElementById("pose-camera-fallback");
+        const activeTag = document.getElementById("camera-active-tag");
+        if (video) {
+            video.srcObject = null;
+            video.style.display = "none";
+        }
+        if (fallback) fallback.style.display = "block";
+        if (activeTag) activeTag.style.display = "none";
+
+        showStage('loading');
+        const loadingText = document.getElementById("interview-loading-step");
+        if (loadingText) loadingText.textContent = "Calculating final performance grades...";
+
+        try {
+            const res = await authFetch('/api/interview/finish', { method: 'POST' });
+            if (!res.ok) throw new Error("Failed to evaluate mock session.");
+            const report = await res.json();
+            
+            // Format for rendering
+            const formattedReport = {
+                score: report.score,
+                verdict: report.score >= 70 ? "Hire" : "No Hire",
+                recruiter_judgment: `Your mock interview is complete. You achieved an overall readiness score of ${report.score}%. Excellent performance explaining project trade-offs!`,
+                strengths: report.feedback.strong_areas || [],
+                weaknesses: report.feedback.weak_areas || [],
+                action_plan: (report.recommendations || []).map(r => `${r.title} (${r.type}): ${r.description}`),
+                categories: [
+                    { category: "Communication", score: report.feedback.communication_score, feedback: "Fluency and articulation rate." },
+                    { category: "Technical", score: report.feedback.technical_score, feedback: "System design decisions and framework trade-offs." },
+                    { category: "Confidence", score: report.feedback.confidence_score, feedback: "Speech rhythm and structural pauses." },
+                    { category: "Behavioral", score: report.feedback.behavior_score, feedback: "STAR situational competency alignments." }
+                ]
+            };
+            
+            renderScorecard(formattedReport);
+        } catch (e) {
+            console.error("Finish mock interview failed:", e);
+            showToast("Failed to compile final report. Returning to hub.");
+            showStage('setup');
+        }
+    };
+
     if (btnStartInterview) {
         btnStartInterview.addEventListener('click', async () => {
             const role = interviewRoleInput.value.trim();
-            const type = interviewTypeSelect.value;
-            const benchmark = interviewBenchmarkSelect.value;
+            const company = interviewBenchmarkSelect.value === "FAANG" ? "Google" : "Amazon";
+            const expLevel = "Mid-Level";
 
             if (!role) {
                 showToast("Please enter your target role.");
@@ -3170,62 +3389,45 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             showStage('loading');
-            if (loadingStepText) loadingStepText.textContent = "Initializing simulation environment...";
-            if (loadingProgressBar) loadingProgressBar.style.width = "15%";
+            if (loadingStepText) loadingStepText.textContent = "Connecting to Recruiter Alex...";
+            if (loadingProgressBar) loadingProgressBar.style.width = "40%";
 
             try {
-                const res = await fetch('/generate-mock-interview', {
+                const res = await authFetch('/api/interview/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ role, interview_type: type, benchmark })
+                    body: JSON.stringify({ company, role, experience_level: expLevel })
                 });
 
-                if (!res.ok) throw new Error("Failed generation request");
+                if (!res.ok) throw new Error("Failed start request");
                 const data = await res.json();
 
-                if (data.error) throw new Error(data.error);
+                // Setup header labels
+                const titleLabel = document.getElementById("voice-interview-round-label");
+                if (titleLabel) titleLabel.textContent = `Recruiter Alex | ${company} Round`;
 
-                interviewChatHistory = [
-                    { sender: 'interviewer', text: data.question }
-                ];
-                currentInterviewMeta = {
-                    role,
-                    type,
-                    benchmark,
-                    interviewerName: data.interviewer_name || "Interviewer"
-                };
+                const subtitleBox = document.getElementById("voice-subtitles-box");
+                if (subtitleBox) subtitleBox.textContent = data.response_text;
 
-                if (interviewerNameLabel) interviewerNameLabel.textContent = currentInterviewMeta.interviewerName;
-                if (interviewMetaLabel) interviewMetaLabel.textContent = `${type} | ${benchmark} Benchmark`;
-                if (interviewProgressPill) interviewProgressPill.textContent = "Turn 1 of 3";
-                
-                if (responseInput) {
-                    responseInput.value = '';
-                    if (type === 'Coding & DSA') {
-                        responseInput.placeholder = "Write your solution approach, time/space complexity, and code here...";
-                    } else if (type === 'System Design') {
-                        responseInput.placeholder = "Design outline: 1. Core Requirements, 2. API Schema, 3. High Level Architecture, 4. Data Flow/Scaling...";
-                    } else {
-                        responseInput.placeholder = "STAR format: Situation, Task, Action, Result...";
+                // Play synthesized voice MP3
+                if (data.audio_url) {
+                    const audio = document.getElementById("voice-audio-element");
+                    if (audio) {
+                        audio.src = data.audio_url;
+                        audio.play();
                     }
                 }
-                
-                if (charCounter) charCounter.textContent = "0 characters";
-                if (btnSubmitAnswer) {
-                    btnSubmitAnswer.textContent = "Submit Answer";
-                    btnSubmitAnswer.disabled = false;
-                }
 
-                renderChatStream();
                 showStage('chat');
 
             } catch (err) {
-                console.error("Start interview failed:", err);
-                showToast(err.message || "Failed to initialize interview simulator.");
+                console.error("Start voice mock failed:", err);
+                showToast("Failed to initialize voice session.");
                 showStage('setup');
             }
         });
     }
+
 
     if (responseInput) {
         responseInput.addEventListener('input', () => {

@@ -2498,6 +2498,10 @@ def run_async(coro):
 from routes.application_routes import application_bp
 app.register_blueprint(application_bp)
 
+# Register Enterprise AI Voice Mock Interview Blueprint
+from routes.interview_routes import interview_routes_bp
+app.register_blueprint(interview_routes_bp)
+
 @app.route("/")
 def index():
     return app.send_static_file("index.html")
