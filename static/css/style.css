@@ -228,38 +228,57 @@ body {
 
 /* Streak Widget in Sidebar */
 .streak-widget {
-  background: var(--bg-main);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+  border: 1px solid rgba(59,130,246,0.3);
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-top: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.streak-widget::before {
+  content: '';
+  position: absolute;
+  top: -20px; right: -20px;
+  width: 80px; height: 80px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .streak-header {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-sub);
-  font-weight: 600;
+  letter-spacing: 0.07em;
+  color: rgba(255,255,255,0.65);
+  font-weight: 700;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
+
+.streak-header svg { color: #fbbf24; }
 
 .streak-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .streak-days {
   font-family: 'Outfit', sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 800;
-  color: var(--text-main);
+  color: #fff;
+  line-height: 1;
 }
 
 .streak-sparkline {
   height: 30px;
   width: 100%;
+  opacity: 0.8;
 }
 
 /* ── MAIN CONTENT AREA ── */
@@ -552,17 +571,20 @@ body {
 
 .progress-pct {
   font-family: 'Outfit', sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--text-main);
+  letter-spacing: -1px;
+  line-height: 1;
 }
 
 .progress-sub {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
 }
 
 /* Right-side Progress Bars list */
@@ -588,8 +610,8 @@ body {
 }
 
 .p-bar-track {
-  height: 6px;
-  background-color: #f1f5f9;
+  height: 7px;
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0);
   border-radius: 99px;
   overflow: hidden;
   width: 100%;
@@ -597,9 +619,23 @@ body {
 
 .p-bar-fill {
   height: 100%;
-  background-color: var(--primary);
+  background: var(--gradient-primary);
   border-radius: 99px;
-  transition: width 0.6s var(--smooth);
+  transition: width 0.8s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+.p-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shimmer-bar 2s infinite 1s;
+}
+
+@keyframes shimmer-bar {
+  to { left: 200%; }
 }
 
 /* Resume Score Card Content */
@@ -617,15 +653,18 @@ body {
 }
 
 .doc-icon {
-  font-size: 2.25rem;
-  width: 56px;
-  height: 56px;
-  background: var(--primary-light);
+  width: 52px;
+  height: 52px;
+  background: var(--gradient-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25);
 }
+
+.doc-icon svg { color: #fff; }
 
 .score-col {
   display: flex;
@@ -723,9 +762,9 @@ body {
   font-size: 1.25rem;
 }
 
-.bg-blue-light   { background-color: #eff6ff; color: #3b82f6; }
-.bg-indigo-light { background-color: #e0e7ff; color: #6366f1; }
-.bg-green-light  { background-color: #ecfdf5; color: #10b981; }
+.bg-blue-light   { background: linear-gradient(135deg, #dbeafe, #eff6ff); color: #2563eb; border: 1px solid rgba(59,130,246,0.15); }
+.bg-indigo-light { background: linear-gradient(135deg, #e0e7ff, #eef2ff); color: #4f46e5; border: 1px solid rgba(99,102,241,0.15); }
+.bg-green-light  { background: linear-gradient(135deg, #d1fae5, #ecfdf5); color: #059669; border: 1px solid rgba(16,185,129,0.15); }
 
 .item-details {
   display: flex;
@@ -783,15 +822,20 @@ body {
 
 .kpi-num {
   font-family: 'Outfit', sans-serif;
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 800;
   color: var(--text-main);
+  line-height: 1;
+  letter-spacing: -1px;
 }
 
 .kpi-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
 }
 
 .practice-chart-wrap {
@@ -1150,18 +1194,33 @@ body {
 
 .btn-watch {
   padding: 10px;
-  background: var(--primary);
+  background: var(--gradient-primary);
   color: #fff;
   border-radius: var(--radius-md);
   text-decoration: none;
   font-weight: 600;
   font-size: 0.85rem;
   text-align: center;
-  transition: all 0.2s var(--smooth);
+  transition: all 0.22s var(--ease-out);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.2);
+  position: relative;
+  overflow: hidden;
 }
 
+.btn-watch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.btn-watch:hover::after { opacity: 1; }
+
 .btn-watch:hover {
-  background: var(--primary-hover);
+  box-shadow: 0 6px 20px rgba(37,99,235,0.38);
+  transform: translateY(-1px);
 }
 
 /* Loading spin */
