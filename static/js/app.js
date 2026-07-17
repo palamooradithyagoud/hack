@@ -1,10 +1,10 @@
 /**
- * SkillRecommender â€” Premium SaaS Frontend Logic
+ * SkillRecommender N/A Premium SaaS Frontend Logic
  * Strictly Vanilla JS (no frameworks)
  */
 
 /**
- * authFetch â€” Drop-in replacement for fetch() that automatically
+ * authFetch N/A Drop-in replacement for fetch() that automatically
  * attaches the Supabase JWT Bearer token to every API request.
  * This is required for all @token_required endpoints on the backend.
  */
@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderSavedPlaylists();
             updateCommandCenter();
         } else {
-            // Add it â€” fetch real videos from YouTube API
+            // Add it N/A fetch real videos from YouTube API
             playlist.savedAt = new Date().toISOString();
             playlist.completed = false;
 
@@ -1423,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>` : ''}
 
                 <a href="${link}" target="_blank" class="btn-watch" rel="noopener noreferrer" style="margin-top:16px;">
-                    Solve on LeetCode â†’
+                    Solve on LeetCode â†'
                 </a>
             `;
 
@@ -1567,7 +1567,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const offset = 314.16 - (314.16 * overallPct / 100);
         progressRingBar.style.strokeDashoffset = offset;
 
-        // Progress Bars Fill â€” DSA uses real data
+        // Progress Bars Fill N/A DSA uses real data
         const dsaLabelText = document.getElementById('dsa-progress-label-text');
         if (dsaLabelText) {
             dsaLabelText.textContent = `DSA (${totalSolved} solved)`;
@@ -1575,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('dsa-progress-label-pct').textContent = `${dsaPct}%`;
         document.getElementById('dsa-progress-bar-fill').style.width = `${dsaPct}%`;
         
-        // System Design â€” based on saved playlists with "system design" in title
+        // System Design N/A based on saved playlists with "system design" in title
         const sdPlaylists = savedPl.filter(p => (p.title + ' ' + (p.skill || '')).toLowerCase().includes('system'));
         const sdTotal = sdPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const sdDone = sdPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1583,7 +1583,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('sd-progress-label-pct').textContent = `${sdPct}%`;
         document.getElementById('sd-progress-bar-fill').style.width = `${sdPct}%`;
         
-        // AI/ML â€” based on saved playlists with "ai" or "ml" or "machine" in title
+        // AI/ML N/A based on saved playlists with "ai" or "ml" or "machine" in title
         const aiPlaylists = savedPl.filter(p => /(ai|ml|machine|deep|neural)/i.test(p.title + ' ' + (p.skill || '')));
         const aiTotal = aiPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const aiDone = aiPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1591,7 +1591,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('aiml-progress-label-pct').textContent = `${aiPct}%`;
         document.getElementById('aiml-progress-bar-fill').style.width = `${aiPct}%`;
         
-        // Dev â€” remaining playlists (not SD/AI categorized)
+        // Dev N/A remaining playlists (not SD/AI categorized)
         const devPlaylists = savedPl.filter(p => !sdPlaylists.includes(p) && !aiPlaylists.includes(p));
         const devTotal = devPlaylists.reduce((a, p) => a + (p.videos ? p.videos.length : 0), 0);
         const devDone = devPlaylists.reduce((a, p) => a + (p.videos ? p.videos.filter(v => v.completed).length : 0), 0);
@@ -1602,7 +1602,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. Update Resume Score Card
         loadResumeScore();
 
-        // 5. Update Practice Overview KPIs â€” real data
+        // 5. Update Practice Overview KPIs N/A real data
         document.getElementById('overview-solved-count').textContent = totalSolved;
         document.getElementById('overview-success-rate').textContent = totalSolved > 0 ? `${Math.round((counts.Easy * 100 + counts.Medium * 70 + counts.Hard * 50) / Math.max(1, totalSolved))}%` : '0%';
         document.getElementById('overview-streak').textContent = streak;
@@ -1649,14 +1649,14 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('dashboard-resume-skills').textContent = data.match;
             document.getElementById('dashboard-resume-ats').textContent = typeof data.ats === 'number' ? `${data.ats}%` : data.ats;
         } else {
-            // No resume uploaded yet â€” show empty state
-            document.getElementById('dashboard-resume-score').textContent = 'â€”/100';
+            // No resume uploaded yet N/A show empty state
+            document.getElementById('dashboard-resume-score').textContent = 'N/A/100';
             const verdictEl = document.getElementById('dashboard-resume-verdict');
             verdictEl.textContent = 'Not analyzed yet';
             verdictEl.className = 'score-verdict';
-            document.getElementById('dashboard-resume-impact').textContent = 'â€”';
-            document.getElementById('dashboard-resume-skills').textContent = 'â€”';
-            document.getElementById('dashboard-resume-ats').textContent = 'â€”';
+            document.getElementById('dashboard-resume-impact').textContent = 'N/A';
+            document.getElementById('dashboard-resume-skills').textContent = 'N/A';
+            document.getElementById('dashboard-resume-ats').textContent = 'N/A';
         }
     };
 
@@ -1902,7 +1902,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Failed to fetch resume for analytics:", e);
             }
         }
-        if (atsScoreEl) atsScoreEl.textContent = latestResumeAnalysis ? `${resumeScore}%` : 'â€”';
+        if (atsScoreEl) atsScoreEl.textContent = latestResumeAnalysis ? `${resumeScore}%` : 'N/A';
         if (atsVerdictEl) {
             atsVerdictEl.textContent = resumeVerdictText;
             atsVerdictEl.style.color = latestResumeAnalysis ? 'var(--primary)' : 'var(--text-muted)';
@@ -2229,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('audit-market-level').textContent = data.market_ready_level || 'Junior (L3)';
         document.getElementById('audit-verdict-text').textContent = `"${data.readiness_verdict}"`;
-        document.getElementById('audit-weeks').textContent = data.estimated_weeks_to_target || 'â€”';
+        document.getElementById('audit-weeks').textContent = data.estimated_weeks_to_target || 'N/A';
         
         // Render technical gaps
         const gapsList = document.getElementById('audit-gaps-list');
@@ -3015,12 +3015,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${ data.must_learn_now && data.must_learn_now.length ? `
                         <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">✅ Learn these NOW:</p>
                         <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px;">
-                            ${data.must_learn_now.map(i => `<li><strong>${escapeHTML(i.skill)}</strong> â€” ${escapeHTML(i.reason)}</li>`).join('')}
+                            ${data.must_learn_now.map(i => `<li><strong>${escapeHTML(i.skill)}</strong> N/A ${escapeHTML(i.reason)}</li>`).join('')}
                         </ul>` : ''}
                         ${ data.improvement_suggestions && data.improvement_suggestions.length ? `
                         <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:6px; font-weight:600;">💡 How to do it better:</p>
                         <ul style="padding-left:16px; color:var(--text-main); font-size:0.85rem; margin-bottom:12px; line-height:1.5;">
-                            ${data.improvement_suggestions.map(s => `<li><strong>${escapeHTML(s.action)}</strong> â€” ${escapeHTML(s.how_to_do_better)}</li>`).join('')}
+                            ${data.improvement_suggestions.map(s => `<li><strong>${escapeHTML(s.action)}</strong> N/A ${escapeHTML(s.how_to_do_better)}</li>`).join('')}
                         </ul>` : ''}
                         <p style="color:var(--text-sub); font-size:0.85rem; line-height:1.6; margin-bottom:12px;">
                             ${escapeHTML(data.brutal_truth)}
@@ -3116,7 +3116,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.className = 'interview-history-item';
                 card.innerHTML = `
                     <div class="interview-history-info">
-                        <div class="interview-history-title">${escapeHTML(item.interview_round_type)} â€” ${escapeHTML(item.target_company)} Tier</div>
+                        <div class="interview-history-title">${escapeHTML(item.interview_round_type)} N/A ${escapeHTML(item.target_company)} Tier</div>
                         <div class="interview-history-meta">Completed: ${dateStr}</div>
                     </div>
                     <div class="interview-history-actions">
@@ -3958,15 +3958,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Difficulty Breakdown</span>
-                                    <strong style="font-size: 1rem; color: var(--text-main);">${escapeHTML(snapshot.difficulty_distribution || 'â€”')}</strong>
+                                    <strong style="font-size: 1rem; color: var(--text-main);">${escapeHTML(snapshot.difficulty_distribution || 'N/A')}</strong>
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Strongest Platform</span>
-                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.strongest_platform || 'â€”')}</strong>
+                                    <strong style="font-size: 1.25rem; color: var(--text-main);">${escapeHTML(snapshot.strongest_platform || 'N/A')}</strong>
                                 </div>
                                 <div style="background: var(--bg-main); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                     <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Contests & Streak</span>
-                                    <strong style="font-size: 0.95rem; color: var(--text-main);">${escapeHTML(snapshot.contest_participation || 'â€”')} (${escapeHTML(snapshot.current_streak || '0')})</strong>
+                                    <strong style="font-size: 0.95rem; color: var(--text-main);">${escapeHTML(snapshot.contest_participation || 'N/A')} (${escapeHTML(snapshot.current_streak || '0')})</strong>
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;">
