@@ -9,3 +9,4 @@ rank,channel_name,playlist_title,language,level,video_count,duration_hours,descr
 8,CodeBeauty,C++ Programming (Full Course),English,Beginner-Advanced,1,10,10-hour single-video full C++ course from beginner to advanced covering OOP pointers and dynamic memory.,https://www.youtube.com/@CodeBeauty,https://www.youtube.com/watch?v=GQp1zzTwrRo
 9,The Cherno,OpenGL (C++),English,Advanced,50,12,Hands-on OpenGL graphics programming series using C++ covering shaders buffers textures and modern GPU techniques.,https://www.youtube.com/@TheCherno,https://www.youtube.com/playlist?list=PLlrATfBNZ98foTJPJ_Ev03o2oq3-GGOS2
 10,Caleb Curry,Data Structures and Algorithms (C++),English,Intermediate,17,4,Focused DSA series in C++ covering big O notation searching sorting trees graphs and common data structures.,https://www.youtube.com/@CalebCurry,https://www.youtube.com/playlist?list=PL_c9BZzLwBRLpDEpYRFXKBN-2ZCsAx0ps
+ 

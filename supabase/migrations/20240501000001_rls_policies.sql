@@ -67,3 +67,4 @@ CREATE POLICY "Users can update their own interview progress"
 CREATE POLICY "Users can delete their own interview progress"
     ON interview_progress FOR DELETE
     USING (auth.uid() = user_id);
+ 

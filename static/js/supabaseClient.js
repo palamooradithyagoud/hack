@@ -207,3 +207,4 @@ window.db = db;
 db.init().catch(err => {
     console.warn("Lazy setup scheduled; client library loading deferred.", err);
 });
+ 

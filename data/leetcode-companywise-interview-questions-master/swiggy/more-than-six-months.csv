@@ -29,3 +29,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 371,https://leetcode.com/problems/sum-of-two-integers,Sum of Two Integers,Medium,55.0%,75.0%
 42,https://leetcode.com/problems/trapping-rain-water,Trapping Rain Water,Hard,66.8%,75.0%
 76,https://leetcode.com/problems/minimum-window-substring,Minimum Window Substring,Hard,46.9%,75.0%
+ 

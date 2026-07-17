@@ -146,3 +146,4 @@ CREATE POLICY "Public upsert learning_progress"
     ON learning_progress FOR ALL USING (true);
 
 -- Service role handles all writes via backend (bypasses RLS automatically)
+ 

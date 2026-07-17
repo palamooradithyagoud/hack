@@ -5,3 +5,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 1570,https://leetcode.com/problems/dot-product-of-two-sparse-vectors,Dot Product of Two Sparse Vectors,Medium,89.9%,50.0%
 41,https://leetcode.com/problems/first-missing-positive,First Missing Positive,Hard,42.4%,50.0%
 208,https://leetcode.com/problems/implement-trie-prefix-tree,Implement Trie (Prefix Tree),Medium,69.2%,62.5%
+ 

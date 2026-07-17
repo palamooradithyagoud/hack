@@ -55,3 +55,4 @@ USING (
     bucket_id = 'resumes' AND 
     (storage.foldername(name))[1] = auth.uid()::text
 );
+ 

@@ -23,3 +23,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 3,https://leetcode.com/problems/longest-substring-without-repeating-characters,Longest Substring Without Repeating Characters,Medium,38.5%,75.0%
 22,https://leetcode.com/problems/generate-parentheses,Generate Parentheses,Medium,78.2%,62.5%
 128,https://leetcode.com/problems/longest-consecutive-sequence,Longest Consecutive Sequence,Medium,47.0%,62.5%
+ 

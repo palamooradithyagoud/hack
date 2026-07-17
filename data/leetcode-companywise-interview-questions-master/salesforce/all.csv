@@ -188,3 +188,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 2603,https://leetcode.com/problems/collect-coins-in-a-tree,Collect Coins in a Tree,Hard,39.6%,25.0%
 105,https://leetcode.com/problems/construct-binary-tree-from-preorder-and-inorder-traversal,Construct Binary Tree from Preorder and Inorder Traversal,Medium,68.3%,25.0%
 3035,https://leetcode.com/problems/maximum-palindromes-after-operations,Maximum Palindromes After Operations,Medium,45.6%,25.0%
+ 

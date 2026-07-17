@@ -5,4 +5,4 @@ public class Main {
         Scraper scraper = new Scraper();
         scraper.setup();
     }
-}
+} 

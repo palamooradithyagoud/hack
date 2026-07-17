@@ -70,3 +70,4 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_interview_progress_modtime
 BEFORE UPDATE ON interview_progress
 FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
+ 

@@ -3665,3 +3665,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Expose trackClick globally for inline onclick handlers
     window.trackClickGlobal = (url, title) => trackClick(url, title, 'click');
 });
+ 

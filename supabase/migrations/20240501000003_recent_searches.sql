@@ -22,3 +22,4 @@ CREATE POLICY "Allow public insert"
 CREATE POLICY "Allow public select"
     ON recent_searches FOR SELECT
     USING (true);
+ 

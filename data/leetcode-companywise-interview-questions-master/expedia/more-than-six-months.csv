@@ -38,3 +38,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 22,https://leetcode.com/problems/generate-parentheses,Generate Parentheses,Medium,78.2%,62.5%
 2062,https://leetcode.com/problems/count-vowel-substrings-of-a-string,Count Vowel Substrings of a String,Easy,72.8%,62.5%
 926,https://leetcode.com/problems/flip-string-to-monotone-increasing,Flip String to Monotone Increasing,Medium,61.8%,62.5%
+ 

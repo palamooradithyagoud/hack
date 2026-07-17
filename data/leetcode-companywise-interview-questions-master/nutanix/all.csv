@@ -67,3 +67,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 605,https://leetcode.com/problems/can-place-flowers,Can Place Flowers,Easy,29.0%,50.0%
 3,https://leetcode.com/problems/longest-substring-without-repeating-characters,Longest Substring Without Repeating Characters,Medium,38.5%,62.5%
 460,https://leetcode.com/problems/lfu-cache,LFU Cache,Hard,48.6%,50.0%
+ 

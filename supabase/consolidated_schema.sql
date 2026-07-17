@@ -255,3 +255,4 @@ CREATE POLICY "Public full access success_metrics" ON success_metrics FOR ALL US
 
 -- Note: Storage buckets creation setup
 -- To set up storage bucket correctly, go to Supabase Dashboard -> Storage -> Create a new bucket named "resumes" (set public = false).
+ 

@@ -26,3 +26,4 @@ ID,URL,Title,Difficulty,Acceptance %,Frequency %
 127,https://leetcode.com/problems/word-ladder,Word Ladder,Hard,44.9%,62.5%
 2904,https://leetcode.com/problems/shortest-and-lexicographically-smallest-beautiful-string,Shortest and Lexicographically Smallest Beautiful String,Medium,40.8%,62.5%
 2038,https://leetcode.com/problems/remove-colored-pieces-if-both-neighbors-are-the-same-color,Remove Colored Pieces if Both Neighbors are the Same Color,Medium,63.0%,100.0%
+ 
