@@ -35,8 +35,8 @@ _sb: SupabaseClient = None
 def get_sb():
     global _sb
     if _sb is None and SupabaseClient:
-        url = os.getenv("SUPABASE_URL", "")
-        key = os.getenv("SUPABASE_SERVICE_KEY", "")
+        url = os.getenv("SUPABASE_URL", "").strip().strip('"').strip("'")
+        key = os.getenv("SUPABASE_SERVICE_KEY", "").strip().strip('"').strip("'")
         if url and key:
             try:
                 _sb = create_client(url, key)
@@ -1417,9 +1417,12 @@ def login_page():
 
 @app.route("/config", methods=["GET"])
 def get_config():
+    def clean(val):
+        """Strip surrounding quotes that .env files sometimes leave in."""
+        return (val or "").strip().strip('"').strip("'")
     return jsonify({
-        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
-        "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY")
+        "SUPABASE_URL":      clean(os.getenv("SUPABASE_URL")),
+        "SUPABASE_ANON_KEY": clean(os.getenv("SUPABASE_ANON_KEY"))
     })
 
 @app.route("/logout")
