@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SkillRecommender â€” Premium SaaS Frontend Logic
  * Strictly Vanilla JS (no frameworks)
  */
@@ -2823,15 +2823,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="job-meta">
                     <div class="job-details-group">
-                        <span class="job-location">📍 ${job.location}</span>
+                        <span class="job-location">📍  ${job.location}</span>
                         <span class="job-salary">${job.salary}</span>
                     </div>
-                    <div class="job-actions">
-                        <button class="btn-job-save ${isSaved ? 'saved' : ''}" onclick="window.toggleSaveJob('${job.id}', this)" title="${isSaved ? 'Unsave Job' : 'Save Job'}">
-                            â¤ï¸
+                    <div class="job-actions" style="display: flex; gap: 8px;">
+                        <button class="btn-job-save ${isSaved ? 'saved' : ''}" onclick="window.toggleSaveJob('${job.id}', this)" title="${isSaved ? 'Unsave Job' : 'Save Job'}" style="flex-shrink:0;">
+                            ❤️
                         </button>
-                        <button class="btn-job-apply" onclick="window.applyToJob('${job.applyLink ? job.applyLink.replace(/'/g, "\\'") : '#'}')">
-                            Apply
+                        <button class="btn-job-apply" onclick="window.applyToJob('${job.applyLink ? job.applyLink.replace(/'/g, "\\'") : '#'}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                            Apply Direct
+                        </button>
+                        <button class="btn-job-apply-ai" onclick="window.applyWithAI('${job.id}', '${job.applyLink ? job.applyLink.replace(/'/g, "\\'") : '#'}', '${job.company ? job.company.replace(/'/g, "\\'") : 'Company'}', '${job.title ? job.title.replace(/'/g, "\\'") : 'Role'}')" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                            Apply with HireMate
                         </button>
                     </div>
                 </div>
@@ -4127,5 +4130,277 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Expose trackClick globally for inline onclick handlers
     window.trackClickGlobal = (url, title) => trackClick(url, title, 'click');
+
+    // ────────────────────────────────────────────────────────────────
+    // HIREMATE APPLY AGENT STATE & CONTROLLER
+    // ────────────────────────────────────────────────────────────────
+    let currentJobDetails = {};
+    let jaCurrentStep = 1;
+
+    window.closeJobAgentModal = () => {
+        const modal = document.getElementById("job-agent-modal");
+        if (modal) modal.style.display = "none";
+    };
+
+    window.closeAndGoToInterviews = () => {
+        window.closeJobAgentModal();
+        switchView("view-interviews");
+        // Update sidebar active states
+        document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.id === 'btn-sidebar-interviews') {
+                item.classList.add('active');
+            }
+        });
+    };
+
+    window.applyWithAI = async (jobId, url, company, role) => {
+        currentJobDetails = { jobId, url, company, role };
+        jaCurrentStep = 1;
+        
+        // Show modal
+        const modal = document.getElementById("job-agent-modal");
+        if (modal) modal.style.display = "flex";
+        
+        // Set header
+        document.getElementById("job-agent-subtitle").textContent = `Automating your application to ${company} for ${role}`;
+        
+        // Render step 1 layout
+        window.jaShowStep(1);
+
+        // Fetch pre-filled details & essay answers from backend
+        try {
+            showToast("Preparing profile & AI essays...");
+            const response = await authFetch("/api/jobs/apply/prepare", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    job_url: url,
+                    company: company,
+                    role: role,
+                    description: "Software engineering role matching profile requirements" // default description
+                })
+            });
+
+            if (!response.ok) throw new Error("Failed to load application data.");
+
+            const data = await response.json();
+            
+            // Set input values for personal details
+            document.getElementById("ja-profile-name").value = data.prefilled_info.full_name || "";
+            document.getElementById("ja-profile-email").value = data.prefilled_info.email || "";
+            document.getElementById("ja-profile-phone").value = data.prefilled_info.phone || "";
+            document.getElementById("ja-profile-linkedin").value = data.prefilled_info.linkedin || "";
+            document.getElementById("ja-profile-github").value = data.prefilled_info.github || "";
+            document.getElementById("ja-profile-portfolio").value = data.prefilled_info.portfolio || "";
+
+            // Set essay answers text
+            document.getElementById("ja-essay-why").value = data.essay_answers["Why Join"] || "";
+            document.getElementById("ja-essay-project").value = data.essay_answers["Key Project"] || "";
+            document.getElementById("ja-essay-alignment").value = data.essay_answers["Alignment"] || "";
+
+        } catch (err) {
+            console.error("[JOB_AGENT] Prepare error:", err);
+            showToast("Failed to prepare AI data. Filling with local profile fallback.");
+            
+            // Use current profile data if available
+            const profileName = document.getElementById('profile-user-name');
+            if (profileName) {
+                document.getElementById("ja-profile-name").value = profileName.textContent || "";
+            }
+            const profileEmail = document.getElementById('profile-user-email');
+            if (profileEmail) {
+                document.getElementById("ja-profile-email").value = profileEmail.textContent || "";
+            }
+        }
+    };
+
+    window.jaShowStep = (stepNum) => {
+        jaCurrentStep = stepNum;
+        
+        // Hide all steps
+        document.querySelectorAll(".job-agent-step").forEach(step => {
+            step.style.display = "none";
+        });
+        
+        // Show target step
+        document.getElementById(`job-agent-step-${stepNum}`).style.display = "flex";
+        
+        // Configure footer buttons
+        const btnPrev = document.getElementById("ja-btn-prev");
+        const btnNext = document.getElementById("ja-btn-next");
+        const btnSubmit = document.getElementById("ja-btn-submit");
+
+        if (stepNum === 1) {
+            btnPrev.style.display = "none";
+            btnNext.style.display = "block";
+            btnSubmit.style.display = "none";
+        } else if (stepNum === 2) {
+            btnPrev.style.display = "block";
+            btnNext.style.display = "block";
+            btnSubmit.style.display = "none";
+        } else if (stepNum === 3) {
+            btnPrev.style.display = "block";
+            btnNext.style.display = "none";
+            btnSubmit.style.display = "block";
+        } else if (stepNum === 4) {
+            btnPrev.style.display = "none";
+            btnNext.style.display = "none";
+            btnSubmit.style.display = "none";
+            document.getElementById("job-agent-modal-close").style.display = "none"; // force click CTA
+        }
+    };
+
+    window.jaNextStep = async () => {
+        if (jaCurrentStep === 1) {
+            window.jaShowStep(2);
+        } else if (jaCurrentStep === 2) {
+            window.jaShowStep(3);
+            
+            // Trigger filling & preview screenshot
+            document.getElementById("ja-preview-screenshot").style.display = "none";
+            document.getElementById("ja-preview-loading").style.display = "block";
+            document.getElementById("ja-captcha-warning").style.display = "none";
+            
+            const profile_data = {
+                full_name: document.getElementById("ja-profile-name").value,
+                email: document.getElementById("ja-profile-email").value,
+                phone: document.getElementById("ja-profile-phone").value,
+                linkedin_profile: document.getElementById("ja-profile-linkedin").value,
+                github_profile: document.getElementById("ja-profile-github").value,
+                portfolio_url: document.getElementById("ja-profile-portfolio").value
+            };
+
+            const essay_answers = {
+                "Why Join": document.getElementById("ja-essay-why").value,
+                "Key Project": document.getElementById("ja-essay-project").value,
+                "Alignment": document.getElementById("ja-essay-alignment").value
+            };
+
+            try {
+                const response = await authFetch("/api/jobs/apply/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        job_url: currentJobDetails.url,
+                        profile_data,
+                        essay_answers
+                    })
+                });
+
+                if (!response.ok) throw new Error("Automation filling failed.");
+
+                const data = await response.json();
+                
+                // Show preview screenshot
+                if (data.screenshot) {
+                    const img = document.getElementById("ja-preview-screenshot");
+                    img.src = data.screenshot;
+                    img.style.display = "block";
+                    document.getElementById("ja-preview-loading").style.display = "none";
+                }
+
+                // Show captcha warning if active
+                if (data.captcha_detected) {
+                    document.getElementById("ja-captcha-warning").style.display = "flex";
+                }
+
+                // Render logs
+                const filledList = document.getElementById("ja-filled-list");
+                const unfilledList = document.getElementById("ja-unfilled-list");
+                filledList.innerHTML = "";
+                unfilledList.innerHTML = "";
+
+                if (data.filled_fields && data.filled_fields.length > 0) {
+                    data.filled_fields.forEach(f => {
+                        const li = document.createElement("li");
+                        li.textContent = f;
+                        filledList.appendChild(li);
+                    });
+                } else {
+                    filledList.innerHTML = "<li>No fields were matching auto-fill patterns</li>";
+                }
+
+                if (data.unfilled_fields && data.unfilled_fields.length > 0) {
+                    data.unfilled_fields.forEach(f => {
+                        const li = document.createElement("li");
+                        li.textContent = f;
+                        unfilledList.appendChild(li);
+                    });
+                } else {
+                    unfilledList.innerHTML = "<li>None</li>";
+                }
+
+            } catch (err) {
+                console.error("[JOB_AGENT] Automator error:", err);
+                showToast("Playwright automator error: " + err.message);
+                document.getElementById("ja-preview-loading").innerHTML = `
+                    <span style="color:#ef4444; font-size:1.5rem;">⚠️</span>
+                    <p style="color:#ef4444; font-weight:600; margin-top:8px;">Automation Failed</p>
+                    <p style="color:#94a3b8; font-size:0.75rem;">${err.message || 'Please check your connection and try again.'}</p>
+                `;
+            }
+        }
+    };
+
+    window.jaPrevStep = () => {
+        if (jaCurrentStep > 1) {
+            window.jaShowStep(jaCurrentStep - 1);
+        }
+    };
+
+    window.jaSubmitConfirm = async () => {
+        // Change submit button to loading state
+        const btnSubmit = document.getElementById("ja-btn-submit");
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = "Submitting application... ⏳";
+
+        const profile_data = {
+            full_name: document.getElementById("ja-profile-name").value,
+            email: document.getElementById("ja-profile-email").value,
+            phone: document.getElementById("ja-profile-phone").value,
+            linkedin_profile: document.getElementById("ja-profile-linkedin").value,
+            github_profile: document.getElementById("ja-profile-github").value,
+            portfolio_url: document.getElementById("ja-profile-portfolio").value
+        };
+
+        const essay_answers = {
+            "Why Join": document.getElementById("ja-essay-why").value,
+            "Key Project": document.getElementById("ja-essay-project").value,
+            "Alignment": document.getElementById("ja-essay-alignment").value
+        };
+
+        try {
+            const response = await authFetch("/api/jobs/apply/confirm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    job_url: currentJobDetails.url,
+                    company: currentJobDetails.company,
+                    role: currentJobDetails.role,
+                    profile_data,
+                    essay_answers
+                })
+            });
+
+            if (!response.ok) throw new Error("Failed to submit form.");
+
+            const data = await response.json();
+            
+            if (data.status === "Applied" || data.status === "Pending Review") {
+                showToast("Application submitted successfully!");
+                window.jaShowStep(4);
+            } else {
+                throw new Error(data.error || "Submission rejected by target site.");
+            }
+
+        } catch (err) {
+            console.error("[JOB_AGENT] Submission error:", err);
+            showToast("Submission failed: " + err.message);
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = "Confirm & Submit Application";
+        }
+    };
+
 });
  

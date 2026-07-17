@@ -1337,6 +1337,143 @@
         </main>
     </div>
 
+    <!-- Job Application Agent Modal -->
+    <div id="job-agent-modal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; font-family: 'Inter', sans-serif;">
+        <div class="modal-content" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 680px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; position: relative;">
+            
+            <!-- Modal Header -->
+            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 id="job-agent-modal-title" style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                        🤖 HireMate Apply Agent
+                    </h3>
+                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-muted);" id="job-agent-subtitle">Automating your application to Company</p>
+                </div>
+                <button id="job-agent-modal-close" style="background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; transition: color 0.2s;" onclick="window.closeJobAgentModal()">×</button>
+            </div>
+
+            <!-- Modal Body (Step content container) -->
+            <div id="job-agent-modal-body" style="padding: 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                
+                <!-- STEP 1: Profile Review -->
+                <div id="job-agent-step-1" class="job-agent-step" style="display: flex; flex-direction: column; gap: 16px;">
+                    <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main);">Step 1: Review & Verify Personal Information</h4>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Please verify that your details match what is expected for the form. You can make adjustments directly below.</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Full Name</label>
+                            <input type="text" id="ja-profile-name" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Email Address</label>
+                            <input type="email" id="ja-profile-email" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Phone Number</label>
+                            <input type="text" id="ja-profile-phone" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">LinkedIn URL</label>
+                            <input type="text" id="ja-profile-linkedin" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">GitHub URL</label>
+                            <input type="text" id="ja-profile-github" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Portfolio Website</label>
+                            <input type="text" id="ja-profile-portfolio" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px;" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Essay Generation & Edit -->
+                <div id="job-agent-step-2" class="job-agent-step" style="display: none; flex-direction: column; gap: 16px;">
+                    <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main);">Step 2: AI-Generated Essay Questions</h4>
+                    <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Groq has generated customized answers to standard job application questions based on your profile. Review and edit as needed.</p>
+                    
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Why are you interested in this role?</label>
+                        <textarea id="ja-essay-why" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px; height: 100px; resize: vertical;"></textarea>
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">Describe a significant technical project you built.</label>
+                        <textarea id="ja-essay-project" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px; height: 100px; resize: vertical;"></textarea>
+                    </div>
+                    <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub);">How does your background align with this role?</label>
+                        <textarea id="ja-essay-alignment" class="skill-input" style="width: 100%; box-sizing: border-box; padding: 10px; height: 100px; resize: vertical;"></textarea>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Playwright Live Preview -->
+                <div id="job-agent-step-3" class="job-agent-step" style="display: none; flex-direction: column; gap: 16px;">
+                    <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text-main);">Step 3: Preview Form Submission</h4>
+                    
+                    <!-- Screenshot Container -->
+                    <div id="ja-preview-img-container" style="border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: #000; position: relative; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;">
+                        <img id="ja-preview-screenshot" src="" alt="Application Form Preview" style="width: 100%; height: 100%; object-fit: contain; display: none;" />
+                        <div id="ja-preview-loading" style="text-align: center; color: #fff; padding: 20px;">
+                            <div style="border: 4px solid rgba(255,255,255,0.1); border-left-color: #fff; border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin: 0 auto 12px;"></div>
+                            <span style="font-size: 0.9rem; font-weight: 600;">Playwright is filling the form...</span>
+                            <p style="margin: 4px 0 0; font-size: 0.75rem; color: #cbd5e1;">This may take up to 20 seconds. Please wait.</p>
+                        </div>
+                    </div>
+
+                    <!-- Warnings & CAPTCHA Alerts -->
+                    <div id="ja-captcha-warning" style="display: none; background: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 12px 16px; color: #b45309; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                        <span>⚠️</span>
+                        <span><strong>CAPTCHA or Verification Detected:</strong> The system identified a manual security check. Please confirm if you wish to bypass or complete it in the preview window.</span>
+                    </div>
+
+                    <!-- Match & Fields Info -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Filled Fields</span>
+                            <ul id="ja-filled-list" style="margin: 8px 0 0; padding-left: 18px; font-size: 0.8rem; color: var(--success); display: flex; flex-direction: column; gap: 4px;">
+                                <!-- Dynamic -->
+                            </ul>
+                        </div>
+                        <div style="background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Unfilled / Ignored Fields</span>
+                            <ul id="ja-unfilled-list" style="margin: 8px 0 0; padding-left: 18px; font-size: 0.8rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+                                <!-- Dynamic -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4: Success State -->
+                <div id="job-agent-step-4" class="job-agent-step" style="display: none; text-align: center; padding: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+                    <div style="background: #ecfdf5; color: var(--success); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 4px 12px rgba(16,185,129,0.15);">
+                        ✓
+                    </div>
+                    <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--text-main);">Application Submitted Successfully!</h3>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-sub); max-width: 420px;">Your job application has been logged. HireMate has automatically initiated interview preparation workflows for this position.</p>
+                    
+                    <button class="cta-button" style="margin-top: 10px;" onclick="window.closeAndGoToInterviews()">
+                        Start Interview Prep ⚡
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer (Navigation buttons) -->
+            <div id="job-agent-modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <button id="ja-btn-prev" class="btn-outline-primary" style="display: none;" onclick="window.jaPrevStep()">Back</button>
+                <div style="flex: 1;"></div>
+                <button id="ja-btn-next" class="cta-button" onclick="window.jaNextStep()">Next</button>
+                <button id="ja-btn-submit" class="cta-button" style="display: none; background: linear-gradient(135deg, #10b981, #059669);" onclick="window.jaSubmitConfirm()">Confirm & Submit Application</button>
+            </div>
+            
+        </div>
+    </div>
+
     <!-- Error Toast -->
     <div id="toast" role="alert">
         <span id="toast-message">Oops! Something went wrong.</span>
