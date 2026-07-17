@@ -50,15 +50,20 @@ def get_sb():
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        token = None
         auth_header = request.headers.get("Authorization")
-        if not auth_header:
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                token = parts[1]
+        
+        # Fallback for SSE EventSource streams
+        if not token:
+            token = request.args.get("token")
+            
+        if not token:
             return jsonify({"error": "Authorization token is missing."}), 401
         
-        parts = auth_header.split()
-        if len(parts) != 2 or parts[0].lower() != "bearer":
-            return jsonify({"error": "Invalid authorization header format. Expected Bearer <token>"}), 401
-        
-        token = parts[1]
         sb = get_sb()
         if not sb:
             return jsonify({"error": "Database service is unavailable."}), 500
