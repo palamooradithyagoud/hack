@@ -226,8 +226,17 @@ class SmartApplyService:
             SmartApplyService.log_message(task_id, f"Navigating to job page: {job_url[:60]}...")
             AUTOMATION_TASKS[task_id]["status"] = "Analyzing job..."
             
-            await page.goto(job_url)
-            await page.wait_for_load_state("networkidle")
+            try:
+                # Use load state 'domcontentloaded' with a 30s timeout for initial page load
+                await page.goto(job_url, timeout=30000, wait_until="domcontentloaded")
+            except Exception as e:
+                SmartApplyService.log_message(task_id, f"Initial navigation warning: {str(e)}")
+
+            try:
+                # Try to wait for networkidle but don't crash if it takes too long
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             
             # Check for immediate login prompts
             if await SmartApplyService._detect_login_page(page):
@@ -608,7 +617,10 @@ class SmartApplyService:
                 btn = await page.query_selector(sel)
                 if btn and await btn.is_visible():
                     await btn.click()
-                    await page.wait_for_load_state("networkidle")
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                    except Exception:
+                        pass
                     return True
             except Exception:
                 pass
